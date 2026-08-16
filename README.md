@@ -74,7 +74,8 @@ Each edge socket defines an orthonormal basis:
 - **Outward** — in the plane of the panel, perpendicular to the edge, pointing away from the
   piece's centre.
 - **Tangent** — along the edge.
-- **Normal** — the panel's surface normal, pointing to the *outside* of the finished structure.
+- **Normal** — the panel's surface normal. Which of the panel's two faces this points to is an
+  arbitrary authoring convention; it does **not** mean "outside of the structure" (§2.5).
 
 Mating two edge sockets means:
 
@@ -108,16 +109,14 @@ Consequences:
   requiring the **least rotation from the piece's current orientation** — the player turns the
   piece roughly the way they want it and the snap commits to that reading. No explicit flip
   control is needed.
-- **Flip admissibility is a per-socket property.** A blank symmetric hull panel should flip
-  freely. A piece with a distinguished interior face — a hatch with a mechanism, a panel with
-  equipment rails or interior trim — must not. Sockets declare which polarities they accept,
-  and the permitted dihedral range may differ between them.
+- **Flipping is always permitted.** No socket declares a preferred face and no piece has an
+  authored "inside". See §2.5 — this is a deliberate design decision, not an unimplemented
+  check.
 - **Flipping relocates attachment sockets** (§2.2) from the hull interior to the exterior.
-  This is usually the real reason a piece forbids flipping, and it is a gameplay consequence
-  rather than a geometric detail.
-- **Surface orientation is no longer globally guaranteed.** Where normals carry meaning,
-  inside/outside must be derived from the enclosed volume rather than assumed from panel
-  normals (§7).
+  That is a real and intended gameplay consequence, owned by the player.
+- **Surface orientation is not globally guaranteed.** Panel normals do not agree on which
+  side is inside, so nothing may treat them as if they do. Inside/outside is derived from the
+  enclosed volume (§2.7).
 
 This is why the "permissible angles" metadata is tractable: it constrains one number, not an
 orientation. A socket pair that permits a single dihedral value yields a **rigid** joint; a
@@ -132,21 +131,45 @@ A candidate connection is evaluated as:
    rejection first.
 2. **Proximity** — socket positions within a tolerance.
 3. **Orientation** — tangents collinear within a tolerance, in either polarity.
-4. **Flip admissibility** — for each polarity, whether both sockets permit it (§2.3).
-5. **Dihedral admissibility** — the resulting angle lies within both sockets' permitted range
-   *for that polarity*.
-6. **Occupancy** — neither socket is already connected.
+4. **Dihedral admissibility** — the resulting angle lies within both sockets' permitted range.
+5. **Occupancy** — neither socket is already connected.
 
-Steps 4 and 5 are evaluated per polarity, so a socket pair can yield zero, one, or two
-admissible solutions. Where both are admissible, the snapper picks the one requiring least
-rotation from the piece's current orientation.
+Both polarities are always admissible (§2.3), so a passing socket pair yields two candidate
+solutions and the snapper picks the one requiring least rotation from the piece's current
+orientation.
 
 When a candidate passes, the piece is snapped: its transform is solved from the target
 socket's basis so that the mating conditions hold exactly, rather than approximately. Snapping
 should be *exact* — accumulated error is what stops a sphere from closing, and a closed
 buckyball is the acceptance test for this whole subsystem.
 
-### 2.5 Physics and welding
+### 2.5 No authored inside or outside
+
+**Pieces do not have an authored interior face, and sockets never constrain which way round a
+piece is fitted.** The player decides, always.
+
+The reasoning: inside/outside is not a property of a *joint*, so encoding it in the socket
+constraint system puts the check in the wrong layer. Whether a placement is *sensible* depends
+on the environment the piece ends up in — which is a runtime question the enclosure system
+(§2.7) already answers — not on a flag set at authoring time.
+
+Consequences, which are features rather than costs:
+
+- **Hatches work both ways round.** A hatch is a hole that can be sealed; it does not care
+  which side the pressure is on.
+- **Racks do not care at all**, unless something stored in them needs an atmosphere — and that
+  is a property of the stored item, checked at runtime.
+- **Equipment may or may not function as intended** in vacuum versus atmosphere. That is
+  gameplay, discovered by the player, not a placement rule that forbids the build.
+
+So the rule is: **PolySnap decides whether pieces can physically connect. It never decides
+whether the result is a good idea.** Environmental suitability is a separate, runtime concern
+belonging to the equipment and atmosphere systems, which query the enclosure graph.
+
+This keeps PolySnap's responsibility narrow, removes a class of authoring decisions from every
+new piece, and lets the player build things we did not anticipate.
+
+### 2.6 Physics and welding
 
 The assembly has two regimes:
 
@@ -166,7 +189,7 @@ all depend on per-piece identity surviving the weld.
 Unwelding — cutting a structure back apart — should be assumed to be a requirement, and the
 merge implemented so it can be reversed.
 
-### 2.6 The assembly graph
+### 2.7 The assembly graph
 
 Pieces are nodes; connections are edges. Once that exists, game systems get their answers by
 walking the graph rather than by geometric queries:
@@ -176,11 +199,18 @@ walking the graph rather than by geometric queries:
 - **Enclosure** — which sets of pieces bound a fully closed volume, and are therefore
   candidates to be treated as **airtight compartments** for atmosphere simulation.
 - **Structural queries** — connectivity, reachability, what breaks off if this piece is cut.
+- **Environment lookup** — which enclosed volume, if any, a given piece or attachment socket
+  sits in. This is what lets equipment decide at runtime whether it is in vacuum or atmosphere
+  (§2.5), instead of that being constrained at build time.
+
+The boundary: PolySnap reports **topology** — what is connected, what is enclosed. It does not
+model pressure, gas, or temperature. An atmosphere system layered on top consumes these
+queries.
 
 The graph is derived from connections and should be maintained incrementally as pieces are
 added and removed, not rebuilt by scanning the world.
 
-### 2.7 Persistence
+### 2.8 Persistence
 
 Save/load must reconstruct an assembly exactly: every piece's class, transform, and identity,
 every connection, and every weld group.
@@ -194,7 +224,7 @@ This requires **stable numeric IDs**:
 Socket IDs must be stable across mesh re-exports, or existing saves break when art is updated.
 This is a real constraint on whatever naming/metadata scheme §2.2 settles on.
 
-### 2.8 Replication-readiness
+### 2.9 Replication-readiness
 
 Multiplayer is **not** being implemented now, but PolySnap should be shaped so co-op does not
 require a rewrite:
@@ -202,7 +232,7 @@ require a rewrite:
 - Snapping is expressed as a **validated operation on the graph** ("connect socket X to socket
   Y"), not as a client directly writing a transform. Validation is a pure function of the two
   sockets and the graph state, so a server can re-run it.
-- The numeric IDs from §2.7 double as network identity.
+- The numeric IDs from §2.8 double as network identity.
 - Physics-driven wobble is treated as cosmetic; the graph is the authority on what is
   connected to what.
 
@@ -268,7 +298,7 @@ Marked explicitly so nobody builds on them as though they were settled.
 
 - **Socket naming scheme and metadata encoding.** Decided: the name carries the metadata.
   Undecided: the actual grammar, how size and type are namespaced, how permissible-angle
-  ranges are expressed, and how socket identity stays stable across mesh re-export (§2.7).
+  ranges are expressed, and how socket identity stays stable across mesh re-export (§2.8).
 - **Magnets.** The idea of magnet sockets to assist alignment is open. Current recommendation:
   do *not* build a separate magnet plugin yet. Assisted alignment is better understood as an
   attraction behaviour of the existing socket search — pulling a held piece toward the best
@@ -277,9 +307,12 @@ Marked explicitly so nobody builds on them as though they were settled.
 - **Weld merge mechanics.** Which merge strategy preserves reversibility at acceptable cost.
 - **Enclosure algorithm.** How enclosure is actually determined — graph cycle analysis, or a
   geometric test — and how it handles hatches, which are openable holes in an otherwise
-  sealed surface. Because flipping is permitted (§2.3), panel normals cannot be assumed to
-  agree on which side is "inside"; if the algorithm needs an inside/outside distinction it
-  must derive it from the enclosed volume.
+  sealed surface. Because pieces have no authored facing (§2.5), panel normals cannot be
+  assumed to agree on which side is "inside"; the algorithm must derive that from the enclosed
+  volume itself.
+- **Environment queries.** What exactly equipment asks for, and how cheaply. "Am I in an
+  enclosed volume" is a graph query; "is that volume actually pressurised" belongs to a future
+  atmosphere system (§2.7). The interface between them is undesigned.
 - **Tolerances.** Snap distance and angular thresholds; whether they are global, per socket
   type, or scaled by piece size.
 - **Framework choices.** Enhanced Input, GAS, StateTree, and similar are undecided and will be
