@@ -72,10 +72,10 @@ There are two broad classes of socket:
 ```
 SOCKET_<Type>_<ID>_<SubType>_<Size>
 
-SOCKET_Edge_001_Straight_200
+SOCKET_Edge_001_Straight_2000
 ```
 
-After import the engine strips the prefix, so the socket is named `Edge_001_Straight_200`.
+After import the engine strips the prefix, so the socket is named `Edge_001_Straight_2000`.
 
 | Field | Example | Meaning |
 | --- | --- | --- |
@@ -83,7 +83,7 @@ After import the engine strips the prefix, so the socket is named `Edge_001_Stra
 | `Type` | `Edge` | What kind of socket. `Edge` is structural; `Attach` is for equipment. Determines how the remaining fields are read. |
 | `ID` | `001` | Identity within the piece. Three digits, zero-padded, `001`–`999`. |
 | `SubType` | `Straight` | Edge geometry. **Only `Straight` is in scope** — curves and circles are a later extension. |
-| `Size` | `200` | Edge length in centimetres (= Unreal units). Integers only. |
+| `Size` | `2000` | Nominal edge length in **millimetres**. Integers only. A compatibility token, not a measurement — see below. |
 
 **`SOCKET_<Type>_<ID>` is a fixed-arity head; everything after it is type-specific and of
 variable arity.** This is why the ID sits third rather than last: when curved edges arrive they
@@ -91,8 +91,42 @@ will need more than one parameter (a radius *and* an arc length), and they can e
 without disturbing how every socket's identity is parsed.
 
 **Compatibility:** two edge sockets may connect only when `Type`, `SubType`, and `Size` all
-match. `Straight_200` mates only with `Straight_200`. The `ID` never participates in
+match. `Straight_2000` mates only with `Straight_2000`. The `ID` never participates in
 compatibility — it is identity, not classification.
+
+#### `Size` is a token, not a measurement
+
+**Nothing in the snap math ever reads `Size`.** Geometry comes entirely from the socket
+transforms baked into the mesh, which are exact floats. `Size` exists only to answer "may these
+two edges mate?" by equality.
+
+That distinction matters, because **edge lengths are frequently irrational**. Diagonal braces
+are useful for structural rigidity, and a regular hexagon of side 2000 has a short diagonal of
+2000√3 ≈ 3464.1 mm. There is no integer to be had, and demanding one would restrict the panel
+set to shapes that happen to come out round — exactly the sort of constraint this project keeps
+rejecting elsewhere.
+
+Since the rounded token never enters the math, that 0.1 mm is not error — it is *labelling*.
+Author the true geometry, then round to the nearest millimetre for the name.
+
+The only real risk is **token collision**: two edges that are not meant to mate rounding to the
+same integer. This is why the unit is millimetres rather than centimetres. In centimetres,
+346.41 cm and 346.0 cm both become `346` and would be wrongly declared compatible — a 4 mm
+mismatch, and a plausible one. At millimetre resolution, collisions between deliberately
+designed parts effectively vanish.
+
+Two consequences to keep in mind:
+
+- **`Size` is not in Unreal units.** UE units are centimetres; this field is millimetres. Never
+  use it as a length in code. That it does not convert cleanly is mildly protective.
+- **Rounding must be consistent.** Two parts meant to mate must round their shared length the
+  same way. Validation should warn when two descriptors differ by only one or two units
+  (`Straight_3464` alongside `Straight_3465`), which almost always means a rounding
+  disagreement rather than two genuinely different edges.
+
+An abstract size vocabulary (`Straight_S`, `Straight_M`) would avoid rounding entirely, but was
+rejected: it is opaque at a glance, and it reintroduces a centrally maintained vocabulary of
+the kind removed when angles became emergent (§2.4).
 
 **Why `SubType` and `Size` stay separate fields** rather than a fused `Straight200`: splitting
 a fused token requires scanning for the alpha/digit boundary, which breaks as soon as a subtype
@@ -104,8 +138,8 @@ expressed as "name plus one number" at all. The compatibility key is the tuple e
 - **`ID` is permanent.** It is what save games store (§2.9), so it must never be renumbered or
   reused. If a socket is removed, retire its ID rather than reassigning it. Changing a panel's
   size changes its `Size` field but must leave IDs untouched.
-- **`Size` is an integer** number of centimetres. There is no decimal form; design panels to
-  whole-centimetre edges.
+- **`Size` is a nominal token in whole millimetres**, rounded from the edge's true length. See
+  below — this deliberately does *not* constrain panel geometry to whole millimetres.
 - **No underscores inside a field.** The underscore is the delimiter.
 - **Case:** write the prefix as `SOCKET_`. The importer's comparison is case-insensitive, so
   `Socket_` also works, but there is no reason to depend on that.
@@ -113,7 +147,7 @@ expressed as "name plus one number" at all. The compatibility key is the tuple e
 #### Authoring traps
 
 - **Blender's `.001` duplicate suffix.** Duplicating an empty produces
-  `SOCKET_Edge_003_Straight_200.001` — note the trailing `.001` is Blender's suffix and has
+  `SOCKET_Edge_003_Straight_2000.001` — note the trailing `.001` is Blender's suffix and has
   nothing to do with the three-digit `ID` field, which is easy to misread. Validation must
   **reject** this rather than silently stripping the suffix: a duplicated socket also carries a
   duplicated `ID`, which is a real error the artist has to fix. Auto-stripping would hide it.
@@ -124,7 +158,9 @@ expressed as "name plus one number" at all. The compatibility key is the tuple e
 
 Malformed names must fail **loudly at import**, not mysteriously at runtime. This is the job
 of PolySnap's editor module: parse every socket on a piece and report malformed names,
-duplicate IDs, unknown subtypes, and unparseable sizes.
+duplicate IDs, unknown subtypes, and unparseable sizes. It should also warn on near-miss size
+tokens across the piece set, which usually indicate inconsistent rounding of the same intended
+length.
 
 Names are parsed **once** into a struct and cached — never re-parsed per frame, and never
 string-compared during a snap query. Runtime compatibility tests operate on the parsed fields.
@@ -253,8 +289,8 @@ the residual, not eyeball it.
 
 A candidate connection is evaluated as:
 
-1. **Descriptor match** — `Type`, `SubType`, and `Size` all equal (§2.2). `Straight_200` mates
-   only with `Straight_200`. Cheap integer comparison, so reject on this first.
+1. **Descriptor match** — `Type`, `SubType`, and `Size` all equal (§2.2). `Straight_2000` mates
+   only with `Straight_2000`. Cheap integer comparison, so reject on this first.
 2. **Proximity** — socket positions within a tolerance.
 3. **Orientation** — tangents collinear within a tolerance, in either polarity.
 4. **Joint capacity** — the joint accepts another participant (§2.4). This replaces a simple
