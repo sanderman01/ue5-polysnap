@@ -45,9 +45,10 @@ it must remain fully independent of this game project (see §6).
 | Concept | What it is |
 | --- | --- |
 | **Piece** | A placeable object — a hull panel, a strut, a hatch. Owns a set of sockets. |
-| **Socket** | A named, oriented connection point on a piece, with a type, a size, and constraints. |
-| **Connection** | A realised link between two compatible sockets on two pieces. |
-| **Assembly** | The connected graph of pieces and connections. |
+| **Socket** | A named, oriented connection point on a piece, with a type and a size. |
+| **Joint** | A shared edge line in space. Hosts two or more sockets — a seam, or a T-junction. |
+| **Connection** | A socket's participation in a joint. |
+| **Assembly** | The connected graph of pieces and joints. |
 | **Weld group** | A set of pieces within an assembly that have been welded into one rigid body. |
 
 ### 2.2 Sockets
@@ -75,7 +76,7 @@ Each edge socket defines an orthonormal basis:
   piece's centre.
 - **Tangent** — along the edge.
 - **Normal** — the panel's surface normal. Which of the panel's two faces this points to is an
-  arbitrary authoring convention; it does **not** mean "outside of the structure" (§2.5).
+  arbitrary authoring convention; it does **not** mean "outside of the structure" (§2.6).
 
 Mating two edge sockets means:
 
@@ -110,20 +111,84 @@ Consequences:
   piece roughly the way they want it and the snap commits to that reading. No explicit flip
   control is needed.
 - **Flipping is always permitted.** No socket declares a preferred face and no piece has an
-  authored "inside". See §2.5 — this is a deliberate design decision, not an unimplemented
+  authored "inside". See §2.6 — this is a deliberate design decision, not an unimplemented
   check.
 - **Flipping relocates attachment sockets** (§2.2) from the hull interior to the exterior.
   That is a real and intended gameplay consequence, owned by the player.
 - **Surface orientation is not globally guaranteed.** Panel normals do not agree on which
   side is inside, so nothing may treat them as if they do. Inside/outside is derived from the
-  enclosed volume (§2.7).
+  enclosed volume (§2.8).
 
-This is why the "permissible angles" metadata is tractable: it constrains one number, not an
-orientation. A socket pair that permits a single dihedral value yields a **rigid** joint; a
-pair that permits a range yields a **hinge**. A buckyball is then just two dihedral values
-applied consistently across the panel set.
+That free DOF is not a problem to be constrained away. It is the mechanism — see §2.4.
 
-### 2.4 Compatibility and snapping
+### 2.4 Angles are emergent, and joints host many edges
+
+#### Nothing authors an angle
+
+**Sockets do not declare permitted dihedral angles.** There is no angle vocabulary, no
+per-socket range, no authored list of shapes the system knows how to build.
+
+A single connection leaves the dihedral free: the piece is a **hinge**, swinging about the
+shared edge. What removes that freedom is the **next** connection. When a second edge of the
+same piece also mates, the angle is no longer free — it is whatever the geometry requires.
+Three panels closing a vertex determine their dihedrals exactly.
+
+This is why the hex-hex angle of a truncated icosahedron is ~138.19°: not because anyone wrote
+that number down, but because that is what regular hexagons and pentagons closing a vertex
+*imply*. Author the panel shapes and the angles fall out.
+
+The consequences are the point:
+
+- **Any shape the panel set admits is buildable** — spheres, domes, tubes, irregular hulls,
+  things we have not thought of. The system has no opinion about the target shape.
+- **New panel geometry needs no new metadata.** Cut a new panel in Blender, and the angles it
+  can form are already implied by its outline.
+- **Rigidity is emergent, not declared.** One connection: a hinge. Two or more: progressively
+  constrained. Welding freezes whatever the structure settled into.
+
+The only angle limit worth keeping is **mechanical** — an edge profile that would
+self-intersect if folded too far. That is a fact about the mesh, not a design constraint on
+shape, and collision can express it. Treat any such clamp as optional and geometric; never as
+a way of steering the player toward intended shapes.
+
+#### Joints: an edge line can host more than two panels
+
+A connection is not restricted to a pair. Several panels may meet along **one shared edge
+line** — an internal bulkhead meeting a hull seam, a partition dividing a cylinder, a spine
+with panels fanning off it.
+
+So the graph gains a first-class concept:
+
+> A **Joint** is a shared edge line in space. Sockets attach *to a joint*, not directly to each
+> other. A two-socket joint is an ordinary seam; an N-socket joint is a T-junction or fan.
+
+With N sockets on a joint there are N−1 independent dihedral angles about the shared axis, all
+free until further connections constrain them. Everything above still holds; the joint is
+simply where the shared axis lives.
+
+Practically this means **socket occupancy is a capacity question, not a boolean**. "Is this
+socket taken?" becomes "does this joint accept another participant?" — and by default it does.
+
+Note this covers panels sharing a *whole* edge line. A long edge spanned by several shorter
+edges end-to-end is a different problem, and is deliberately **not** solved here (§7).
+
+#### Closing a loop
+
+With free angles, a ring of panels will rarely close to floating-point exactness. When the
+final socket pair lands within tolerance, **connect, and let the physics constraints absorb
+the residual strain.**
+
+This is deliberately the simple option, and it is nearly free: the constraint solver is
+already an iterative relaxation solver, so letting the assembly settle distributes the error
+around the loop by itself — which is what a bespoke closure solver would do, without the extra
+machinery and without yanking already-placed pieces out from under the player. Welding then
+freezes the settled geometry.
+
+This holds **only if per-connection snapping stays exact**. Visible drift when closing a
+buckyball is a bug in the snap transform, not a tolerance to widen. Milestone 2 should measure
+the residual, not eyeball it.
+
+### 2.5 Compatibility and snapping
 
 A candidate connection is evaluated as:
 
@@ -131,8 +196,11 @@ A candidate connection is evaluated as:
    rejection first.
 2. **Proximity** — socket positions within a tolerance.
 3. **Orientation** — tangents collinear within a tolerance, in either polarity.
-4. **Dihedral admissibility** — the resulting angle lies within both sockets' permitted range.
-5. **Occupancy** — neither socket is already connected.
+4. **Joint capacity** — the joint accepts another participant (§2.4). This replaces a simple
+   occupancy test, and by default it passes.
+
+Note what is *absent*: no dihedral check. The resulting angle is whatever the placement
+produces, and remains free until further connections constrain it (§2.4).
 
 Both polarities are always admissible (§2.3), so a passing socket pair yields two candidate
 solutions and the snapper picks the one requiring least rotation from the piece's current
@@ -143,7 +211,7 @@ socket's basis so that the mating conditions hold exactly, rather than approxima
 should be *exact* — accumulated error is what stops a sphere from closing, and a closed
 buckyball is the acceptance test for this whole subsystem.
 
-### 2.5 No authored inside or outside
+### 2.6 No authored inside or outside
 
 **Pieces do not have an authored interior face, and sockets never constrain which way round a
 piece is fitted.** The player decides, always.
@@ -151,7 +219,7 @@ piece is fitted.** The player decides, always.
 The reasoning: inside/outside is not a property of a *joint*, so encoding it in the socket
 constraint system puts the check in the wrong layer. Whether a placement is *sensible* depends
 on the environment the piece ends up in — which is a runtime question the enclosure system
-(§2.7) already answers — not on a flag set at authoring time.
+(§2.8) already answers — not on a flag set at authoring time.
 
 Consequences, which are features rather than costs:
 
@@ -169,7 +237,7 @@ belonging to the equipment and atmosphere systems, which query the enclosure gra
 This keeps PolySnap's responsibility narrow, removes a class of authoring decisions from every
 new piece, and lets the player build things we did not anticipate.
 
-### 2.6 Physics and welding
+### 2.7 Physics and welding
 
 The assembly has two regimes:
 
@@ -189,19 +257,24 @@ all depend on per-piece identity surviving the weld.
 Unwelding — cutting a structure back apart — should be assumed to be a requirement, and the
 merge implemented so it can be reversed.
 
-### 2.7 The assembly graph
+### 2.8 The assembly graph
 
-Pieces are nodes; connections are edges. Once that exists, game systems get their answers by
-walking the graph rather than by geometric queries:
+The graph is **bipartite**: pieces and joints are both nodes, and a connection links a piece's
+socket to a joint. This is what lets a joint host three or more panels (§2.4) without the
+graph needing a special case — a T-junction is just a joint of degree three.
 
-- **Open edges** — sockets with no connection. Drives build UI, ghost previews, and the
-  "what can I attach here" query.
+Once that exists, game systems get their answers by walking the graph rather than by geometric
+queries:
+
+- **Open edges** — sockets participating in no joint. Drives build UI, ghost previews, and the
+  "what can I attach here" query. Note a socket already in a joint may still accept more
+  panels, so "open" and "available" are different questions.
 - **Enclosure** — which sets of pieces bound a fully closed volume, and are therefore
   candidates to be treated as **airtight compartments** for atmosphere simulation.
 - **Structural queries** — connectivity, reachability, what breaks off if this piece is cut.
 - **Environment lookup** — which enclosed volume, if any, a given piece or attachment socket
   sits in. This is what lets equipment decide at runtime whether it is in vacuum or atmosphere
-  (§2.5), instead of that being constrained at build time.
+  (§2.6), instead of that being constrained at build time.
 
 The boundary: PolySnap reports **topology** — what is connected, what is enclosed. It does not
 model pressure, gas, or temperature. An atmosphere system layered on top consumes these
@@ -210,21 +283,23 @@ queries.
 The graph is derived from connections and should be maintained incrementally as pieces are
 added and removed, not rebuilt by scanning the world.
 
-### 2.8 Persistence
+### 2.9 Persistence
 
 Save/load must reconstruct an assembly exactly: every piece's class, transform, and identity,
-every connection, and every weld group.
+every joint and its participants, and every weld group.
 
 This requires **stable numeric IDs**:
 
 - Each piece instance gets an ID, unique within the save.
 - Each socket is identified by a stable local index or ID within its piece.
-- A connection is therefore `(PieceID_A, SocketID_A, PieceID_B, SocketID_B)`.
+- Each joint instance gets an ID, unique within the save.
+- A connection is therefore `(JointID, PieceID, SocketID)` — one record per participating
+  socket, so a joint of degree three saves as three records rather than needing a special case.
 
 Socket IDs must be stable across mesh re-exports, or existing saves break when art is updated.
 This is a real constraint on whatever naming/metadata scheme §2.2 settles on.
 
-### 2.9 Replication-readiness
+### 2.10 Replication-readiness
 
 Multiplayer is **not** being implemented now, but PolySnap should be shaped so co-op does not
 require a rewrite:
@@ -232,7 +307,7 @@ require a rewrite:
 - Snapping is expressed as a **validated operation on the graph** ("connect socket X to socket
   Y"), not as a client directly writing a transform. Validation is a pure function of the two
   sockets and the graph state, so a server can re-run it.
-- The numeric IDs from §2.8 double as network identity.
+- The numeric IDs from §2.9 double as network identity.
 - Physics-driven wobble is treated as cosmetic; the graph is the authority on what is
   connected to what.
 
@@ -264,12 +339,13 @@ panels and get the same snapping system.
 
 ## 5. Milestones
 
-1. **Two pieces snap edge-to-edge in PIE.** One piece type, one socket type. Proximity,
-   orientation, and dihedral checks; exact snap transform. This proves the socket math before
-   anything is built on top of it.
-2. **A closed buckyball.** Hexes and pents assembling into a sealed truncated icosahedron
-   without accumulated drift. The real geometric test.
-3. **Assembly graph and open-edge queries.**
+1. **Two pieces snap edge-to-edge in PIE.** One piece type, one socket type. Proximity and
+   orientation checks; exact snap transform; the resulting joint free to hinge. This proves
+   the socket math before anything is built on top of it.
+2. **A closed buckyball.** Hexes and pents assembling into a sealed truncated icosahedron,
+   with the dihedral angles emerging from vertex closure rather than being authored (§2.4).
+   The real geometric test — **measure** the residual gap at closure rather than eyeballing it.
+3. **Assembly graph and open-edge queries**, including a joint of degree three.
 4. **Welding** — merge to a single rigid body, identities preserved, reversible.
 5. **Save/load** of a complete assembly.
 6. **Enclosure detection** — identify airtight volumes.
@@ -296,9 +372,17 @@ per feature, in conversation, not assumed.
 
 Marked explicitly so nobody builds on them as though they were settled.
 
-- **Socket naming scheme and metadata encoding.** Decided: the name carries the metadata.
-  Undecided: the actual grammar, how size and type are namespaced, how permissible-angle
-  ranges are expressed, and how socket identity stays stable across mesh re-export (§2.8).
+- **Socket naming scheme and metadata encoding.** Decided: the name carries the metadata, and
+  it no longer needs to carry angles or facing (§2.4, §2.6). Undecided: the actual grammar,
+  how size and type are namespaced, and how socket identity stays stable across mesh re-export
+  (§2.9).
+- **Collinear subdivision.** A long edge spanned by several shorter edges end-to-end — a 2 m
+  panel meeting two 1 m panels — is *not* addressed by joints (§2.4), which cover panels
+  sharing a whole edge line. It would need either sockets with extent along the edge, or
+  several sockets authored along the long edge. Deferred deliberately; if it becomes a
+  requirement it likely adds a length field to the naming grammar.
+- **Joint capacity limits.** Whether a joint should ever refuse a participant, and on what
+  grounds — physical interpenetration, or nothing at all.
 - **Magnets.** The idea of magnet sockets to assist alignment is open. Current recommendation:
   do *not* build a separate magnet plugin yet. Assisted alignment is better understood as an
   attraction behaviour of the existing socket search — pulling a held piece toward the best
@@ -307,12 +391,12 @@ Marked explicitly so nobody builds on them as though they were settled.
 - **Weld merge mechanics.** Which merge strategy preserves reversibility at acceptable cost.
 - **Enclosure algorithm.** How enclosure is actually determined — graph cycle analysis, or a
   geometric test — and how it handles hatches, which are openable holes in an otherwise
-  sealed surface. Because pieces have no authored facing (§2.5), panel normals cannot be
+  sealed surface. Because pieces have no authored facing (§2.6), panel normals cannot be
   assumed to agree on which side is "inside"; the algorithm must derive that from the enclosed
   volume itself.
 - **Environment queries.** What exactly equipment asks for, and how cheaply. "Am I in an
   enclosed volume" is a graph query; "is that volume actually pressurised" belongs to a future
-  atmosphere system (§2.7). The interface between them is undesigned.
+  atmosphere system (§2.8). The interface between them is undesigned.
 - **Tolerances.** Snap distance and angular thresholds; whether they are global, per socket
   type, or scaled by piece size.
 - **Framework choices.** Enhanced Input, GAS, StateTree, and similar are undecided and will be
