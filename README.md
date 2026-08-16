@@ -55,10 +55,8 @@ it must remain fully independent of this game project (see §6).
 
 Sockets are authored in Blender as empties parented to the mesh and exported via FBX. Unreal
 imports FBX nodes prefixed `SOCKET_` as static mesh sockets, stripping the prefix — so the
-remainder of the name is ours to use as an encoded descriptor of type, size, and role.
-
-The empty's name carries the metadata, rather than a parallel data asset that could drift out
-of sync with the mesh.
+remainder of the name is ours to encode metadata in, rather than a parallel data asset that
+could drift out of sync with the mesh.
 
 There are two broad classes of socket:
 
@@ -96,37 +94,29 @@ compatibility — it is identity, not classification.
 
 #### `Size` is a token, not a measurement
 
-**Nothing in the snap math ever reads `Size`.** Geometry comes entirely from the socket
-transforms baked into the mesh, which are exact floats. `Size` exists only to answer "may these
-two edges mate?" by equality.
+**Nothing in the snap math reads `Size`.** Geometry comes entirely from the socket transforms
+baked into the mesh, which are exact floats; `Size` only answers "may these two edges mate?"
+by equality.
 
-That distinction matters, because **edge lengths are frequently irrational**. Diagonal braces
-are useful for structural rigidity, and a regular hexagon of side 2000 has a short diagonal of
-2000√3 ≈ 3464.1 mm. There is no integer to be had, and demanding one would restrict the panel
-set to shapes that happen to come out round — exactly the sort of constraint this project keeps
-rejecting elsewhere.
+That matters because **edge lengths are frequently irrational** — diagonal braces are useful
+for structural rigidity, and a regular hexagon of side 2000 has a short diagonal of
+2000√3 ≈ 3464.1 mm. Demanding an integer would restrict the panel set to shapes that happen to
+come out round. Since the rounded token never enters the math, that 0.1 mm is not error but
+*labelling*: author the true geometry, then round to the nearest millimetre for the name.
 
-Since the rounded token never enters the math, that 0.1 mm is not error — it is *labelling*.
-Author the true geometry, then round to the nearest millimetre for the name.
-
-The only real risk is **token collision**: two edges that are not meant to mate rounding to the
-same integer. This is why the unit is millimetres rather than centimetres. In centimetres,
-346.41 cm and 346.0 cm both become `346` and would be wrongly declared compatible — a 4 mm
-mismatch, and a plausible one. At millimetre resolution, collisions between deliberately
-designed parts effectively vanish.
-
-Two consequences to keep in mind:
+The one real risk is **token collision** — two edges not meant to mate rounding to the same
+integer. Hence millimetres rather than centimetres: at centimetre resolution 346.41 and 346.0
+both become `346`, a plausible 4 mm mismatch wrongly declared compatible.
 
 - **`Size` is not in Unreal units.** UE units are centimetres; this field is millimetres. Never
-  use it as a length in code. That it does not convert cleanly is mildly protective.
-- **Rounding must be consistent.** Two parts meant to mate must round their shared length the
-  same way. Validation should warn when two descriptors differ by only one or two units
-  (`Straight_3464` alongside `Straight_3465`), which almost always means a rounding
-  disagreement rather than two genuinely different edges.
+  use it as a length in code.
+- **Rounding must be consistent.** Validation should warn when two descriptors differ by one or
+  two units (`Straight_3464` alongside `Straight_3465`), which almost always means two parts
+  rounded the same intended length differently.
 
-An abstract size vocabulary (`Straight_S`, `Straight_M`) would avoid rounding entirely, but was
-rejected: it is opaque at a glance, and it reintroduces a centrally maintained vocabulary of
-the kind removed when angles became emergent (§2.4).
+An abstract size vocabulary (`Straight_S`, `Straight_M`) would avoid rounding but is opaque at
+a glance, and reintroduces a centrally maintained vocabulary of the kind removed when angles
+became emergent (§2.4).
 
 **Why `SubType` and `Size` stay separate fields** rather than a fused `Straight200`: splitting
 a fused token requires scanning for the alpha/digit boundary, which breaks as soon as a subtype
@@ -138,8 +128,6 @@ expressed as "name plus one number" at all. The compatibility key is the tuple e
 - **`ID` is permanent.** It is what save games store (§2.9), so it must never be renumbered or
   reused. If a socket is removed, retire its ID rather than reassigning it. Changing a panel's
   size changes its `Size` field but must leave IDs untouched.
-- **`Size` is a nominal token in whole millimetres**, rounded from the edge's true length. See
-  below — this deliberately does *not* constrain panel geometry to whole millimetres.
 - **No underscores inside a field.** The underscore is the delimiter.
 - **Case:** write the prefix as `SOCKET_`. The importer's comparison is case-insensitive, so
   `Socket_` also works, but there is no reason to depend on that.
@@ -208,15 +196,14 @@ Consequences:
   piece roughly the way they want it and the snap commits to that reading. No explicit flip
   control is needed.
 - **Flipping is always permitted.** No socket declares a preferred face and no piece has an
-  authored "inside". See §2.6 — this is a deliberate design decision, not an unimplemented
-  check.
+  authored "inside" (§2.6) — a deliberate decision, not an unimplemented check.
 - **Flipping relocates attachment sockets** (§2.2) from the hull interior to the exterior.
   That is a real and intended gameplay consequence, owned by the player.
 - **Surface orientation is not globally guaranteed.** Panel normals do not agree on which
   side is inside, so nothing may treat them as if they do. Inside/outside is derived from the
   enclosed volume (§2.8).
 
-That free DOF is not a problem to be constrained away. It is the mechanism — see §2.4.
+That free DOF is not a problem to be constrained away — it is the mechanism (§2.4).
 
 ### 2.4 Angles are emergent, and joints host many edges
 
@@ -260,8 +247,7 @@ So the graph gains a first-class concept:
 > other. A two-socket joint is an ordinary seam; an N-socket joint is a T-junction or fan.
 
 With N sockets on a joint there are N−1 independent dihedral angles about the shared axis, all
-free until further connections constrain them. Everything above still holds; the joint is
-simply where the shared axis lives.
+free until further connections constrain them.
 
 Practically this means **socket occupancy is a capacity question, not a boolean**. "Is this
 socket taken?" becomes "does this joint accept another participant?" — and by default it does.
@@ -275,11 +261,10 @@ With free angles, a ring of panels will rarely close to floating-point exactness
 final socket pair lands within tolerance, **connect, and let the physics constraints absorb
 the residual strain.**
 
-This is deliberately the simple option, and it is nearly free: the constraint solver is
-already an iterative relaxation solver, so letting the assembly settle distributes the error
-around the loop by itself — which is what a bespoke closure solver would do, without the extra
-machinery and without yanking already-placed pieces out from under the player. Welding then
-freezes the settled geometry.
+This is nearly free: the constraint solver is already an iterative relaxation solver, so
+letting the assembly settle distributes the error around the loop by itself — what a bespoke
+closure solver would do, without the machinery and without yanking already-placed pieces out
+from under the player. Welding then freezes the settled geometry.
 
 This holds **only if per-connection snapping stays exact**. Visible drift when closing a
 buckyball is a bug in the snap transform, not a tolerance to widen. Milestone 2 should measure
@@ -303,10 +288,9 @@ Both polarities are always admissible (§2.3), so a passing socket pair yields t
 solutions and the snapper picks the one requiring least rotation from the piece's current
 orientation.
 
-When a candidate passes, the piece is snapped: its transform is solved from the target
-socket's basis so that the mating conditions hold exactly, rather than approximately. Snapping
-should be *exact* — accumulated error is what stops a sphere from closing, and a closed
-buckyball is the acceptance test for this whole subsystem.
+When a candidate passes, the piece's transform is solved from the target socket's basis so the
+mating conditions hold **exactly**, not approximately. Accumulated error is what stops a sphere
+from closing, and a closed buckyball is the acceptance test for this subsystem.
 
 ### 2.6 No authored inside or outside
 
@@ -330,9 +314,6 @@ Consequences, which are features rather than costs:
 So the rule is: **PolySnap decides whether pieces can physically connect. It never decides
 whether the result is a good idea.** Environmental suitability is a separate, runtime concern
 belonging to the equipment and atmosphere systems, which query the enclosure graph.
-
-This keeps PolySnap's responsibility narrow, removes a class of authoring decisions from every
-new piece, and lets the player build things we did not anticipate.
 
 ### 2.7 Physics and welding
 
@@ -410,8 +391,6 @@ require a rewrite:
 - Physics-driven wobble is treated as cosmetic; the graph is the authority on what is
   connected to what.
 
-This costs a little discipline now and avoids an architectural rewrite later.
-
 ---
 
 ## 3. Player movement (test harness only)
@@ -420,8 +399,7 @@ A simple Newtonian free-flying pawn — RCS-style translation and rotation, no g
 needed to exercise the system: approach a rack, grab a piece, manoeuvre it, snap it.
 
 This is **test scaffolding, not a product**. It lives in the `Construction` game module (or as
-a Blueprint in `Content/`), never in PolySnap. A snapping plugin has no business knowing how
-the player moves.
+a Blueprint in `Content/`), never in PolySnap.
 
 ---
 
@@ -429,10 +407,8 @@ the player moves.
 
 Construction pieces — the hex and pent panels, struts, hatches — live in this project's
 `Content/` directory, **not** inside the plugin. PolySnap supplies the types, rules, and
-runtime behaviour; the panels are game content that happens to use it.
-
-This is the right split for a plugin meant to be reused: a different game would bring its own
-panels and get the same snapping system.
+runtime behaviour; the panels are game content that happens to use it. A different game brings
+its own panels and gets the same snapping system.
 
 ---
 
@@ -455,7 +431,7 @@ Attachment sockets, atmosphere simulation, and equipment come after the structur
 
 ## 6. Plugin boundaries
 
-Restating the rule from CLAUDE.md because it is the whole point of this project:
+Restating CLAUDE.md's rule, because it is the point of this project:
 
 **PolySnap must have zero dependencies on the `Construction` game module.** No includes, no
 references to project content, no assumptions about the player pawn or game mode. The game
