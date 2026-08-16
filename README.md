@@ -57,9 +57,8 @@ Sockets are authored in Blender as empties parented to the mesh and exported via
 imports FBX nodes prefixed `SOCKET_` as static mesh sockets, stripping the prefix — so the
 remainder of the name is ours to use as an encoded descriptor of type, size, and role.
 
-**The exact naming scheme and metadata encoding are not yet decided** — see §7. What *is*
-decided is that the empty's name carries the metadata, rather than a parallel data asset that
-could drift out of sync with the mesh.
+The empty's name carries the metadata, rather than a parallel data asset that could drift out
+of sync with the mesh.
 
 There are two broad classes of socket:
 
@@ -67,6 +66,67 @@ There are two broad classes of socket:
 - **Attachment sockets** — mounting points for equipment, wiring, pipes, and similar. Same
   underlying primitive, different type namespace; they participate in the graph too, so that
   systems can ask what a piece has attached to it.
+
+#### The naming grammar
+
+```
+SOCKET_<Type>_<ID>_<SubType>_<Size>
+
+SOCKET_Edge_01_Straight_200
+```
+
+After import the engine strips the prefix, so the socket is named `Edge_01_Straight_200`.
+
+| Field | Example | Meaning |
+| --- | --- | --- |
+| `SOCKET_` | `SOCKET_` | Required prefix. How Unreal recognises the empty as a socket. |
+| `Type` | `Edge` | What kind of socket. `Edge` is structural; `Attach` is for equipment. Determines how the remaining fields are read. |
+| `ID` | `01` | Identity within the piece. Two digits, zero-padded, `01`–`99`. |
+| `SubType` | `Straight` | Edge geometry. **Only `Straight` is in scope** — curves and circles are a later extension. |
+| `Size` | `200` | Edge length in centimetres (= Unreal units). Integers only. |
+
+**`SOCKET_<Type>_<ID>` is a fixed-arity head; everything after it is type-specific and of
+variable arity.** This is why the ID sits third rather than last: when curved edges arrive they
+will need more than one parameter (a radius *and* an arc length), and they can extend the tail
+without disturbing how every socket's identity is parsed.
+
+**Compatibility:** two edge sockets may connect only when `Type`, `SubType`, and `Size` all
+match. `Straight_200` mates only with `Straight_200`. The `ID` never participates in
+compatibility — it is identity, not classification.
+
+**Why `SubType` and `Size` stay separate fields** rather than a fused `Straight200`: splitting
+a fused token requires scanning for the alpha/digit boundary, which breaks as soon as a subtype
+name contains a digit; and a subtype with two parameters — as curves will have — cannot be
+expressed as "name plus one number" at all. The compatibility key is the tuple either way.
+
+#### Field rules
+
+- **`ID` is permanent.** It is what save games store (§2.9), so it must never be renumbered or
+  reused. If a socket is removed, retire its ID rather than reassigning it. Changing a panel's
+  size changes its `Size` field but must leave IDs untouched.
+- **`Size` is an integer** number of centimetres. There is no decimal form; design panels to
+  whole-centimetre edges.
+- **No underscores inside a field.** The underscore is the delimiter.
+- **Case:** write the prefix as `SOCKET_`. The importer's comparison is case-insensitive, so
+  `Socket_` also works, but there is no reason to depend on that.
+
+#### Authoring traps
+
+- **Blender's `.001` duplicate suffix.** Duplicating an empty produces
+  `SOCKET_Edge_01_Straight_200.001`. Validation must **reject** this rather than silently
+  stripping the suffix — a duplicated socket also carries a duplicated `ID`, which is a real
+  error the artist has to fix. Auto-stripping would hide it.
+- **The empty must export as an FBX null.** The importer only accepts `eNull` (and skeleton)
+  attributes, which is what a Blender empty parented to the mesh produces.
+
+#### Validation and parsing
+
+Malformed names must fail **loudly at import**, not mysteriously at runtime. This is the job
+of PolySnap's editor module: parse every socket on a piece and report malformed names,
+duplicate IDs, unknown subtypes, and unparseable sizes.
+
+Names are parsed **once** into a struct and cached — never re-parsed per frame, and never
+string-compared during a snap query. Runtime compatibility tests operate on the parsed fields.
 
 ### 2.3 Socket orientation — the load-bearing convention
 
@@ -192,8 +252,8 @@ the residual, not eyeball it.
 
 A candidate connection is evaluated as:
 
-1. **Type and size match** — a large hex edge does not mate with a small pent edge. Cheap
-   rejection first.
+1. **Descriptor match** — `Type`, `SubType`, and `Size` all equal (§2.2). `Straight_200` mates
+   only with `Straight_200`. Cheap integer comparison, so reject on this first.
 2. **Proximity** — socket positions within a tolerance.
 3. **Orientation** — tangents collinear within a tolerance, in either polarity.
 4. **Joint capacity** — the joint accepts another participant (§2.4). This replaces a simple
@@ -291,13 +351,15 @@ every joint and its participants, and every weld group.
 This requires **stable numeric IDs**:
 
 - Each piece instance gets an ID, unique within the save.
-- Each socket is identified by a stable local index or ID within its piece.
+- Each socket is identified by the `ID` field of its name (§2.2), unique within its piece.
+  This is why that field is permanent and never reused.
 - Each joint instance gets an ID, unique within the save.
 - A connection is therefore `(JointID, PieceID, SocketID)` — one record per participating
   socket, so a joint of degree three saves as three records rather than needing a special case.
 
 Socket IDs must be stable across mesh re-exports, or existing saves break when art is updated.
-This is a real constraint on whatever naming/metadata scheme §2.2 settles on.
+The grammar (§2.2) is built for this: `ID` is a field of its own, so re-cutting a panel changes
+its `Size` while leaving every socket's identity intact.
 
 ### 2.10 Replication-readiness
 
@@ -372,10 +434,12 @@ per feature, in conversation, not assumed.
 
 Marked explicitly so nobody builds on them as though they were settled.
 
-- **Socket naming scheme and metadata encoding.** Decided: the name carries the metadata, and
-  it no longer needs to carry angles or facing (§2.4, §2.6). Undecided: the actual grammar,
-  how size and type are namespaced, and how socket identity stays stable across mesh re-export
-  (§2.9).
+- **Attachment socket fields.** The grammar's head (§2.2) is settled for all socket types, but
+  what an `Attach` socket needs in its tail — mount class, load rating, orientation freedom —
+  is undesigned. Deferred until equipment is a real feature.
+- **Curved edge subtypes.** Only `Straight` is in scope. Curves will need a multi-parameter
+  tail (radius and arc length), which the grammar is shaped to accommodate but which nothing
+  has been designed for.
 - **Collinear subdivision.** A long edge spanned by several shorter edges end-to-end — a 2 m
   panel meeting two 1 m panels — is *not* addressed by joints (§2.4), which cover panels
   sharing a whole edge line. It would need either sockets with extent along the edge, or
