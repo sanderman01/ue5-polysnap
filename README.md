@@ -72,16 +72,16 @@ There are two broad classes of socket:
 ```
 SOCKET_<Type>_<ID>_<SubType>_<Size>
 
-SOCKET_Edge_01_Straight_200
+SOCKET_Edge_001_Straight_200
 ```
 
-After import the engine strips the prefix, so the socket is named `Edge_01_Straight_200`.
+After import the engine strips the prefix, so the socket is named `Edge_001_Straight_200`.
 
 | Field | Example | Meaning |
 | --- | --- | --- |
 | `SOCKET_` | `SOCKET_` | Required prefix. How Unreal recognises the empty as a socket. |
 | `Type` | `Edge` | What kind of socket. `Edge` is structural; `Attach` is for equipment. Determines how the remaining fields are read. |
-| `ID` | `01` | Identity within the piece. Two digits, zero-padded, `01`–`99`. |
+| `ID` | `001` | Identity within the piece. Three digits, zero-padded, `001`–`999`. |
 | `SubType` | `Straight` | Edge geometry. **Only `Straight` is in scope** — curves and circles are a later extension. |
 | `Size` | `200` | Edge length in centimetres (= Unreal units). Integers only. |
 
@@ -113,9 +113,10 @@ expressed as "name plus one number" at all. The compatibility key is the tuple e
 #### Authoring traps
 
 - **Blender's `.001` duplicate suffix.** Duplicating an empty produces
-  `SOCKET_Edge_01_Straight_200.001`. Validation must **reject** this rather than silently
-  stripping the suffix — a duplicated socket also carries a duplicated `ID`, which is a real
-  error the artist has to fix. Auto-stripping would hide it.
+  `SOCKET_Edge_003_Straight_200.001` — note the trailing `.001` is Blender's suffix and has
+  nothing to do with the three-digit `ID` field, which is easy to misread. Validation must
+  **reject** this rather than silently stripping the suffix: a duplicated socket also carries a
+  duplicated `ID`, which is a real error the artist has to fix. Auto-stripping would hide it.
 - **The empty must export as an FBX null.** The importer only accepts `eNull` (and skeleton)
   attributes, which is what a Blender empty parented to the mesh produces.
 
