@@ -1,0 +1,22 @@
+CLAUDE.md
+  s_13674d577983e8::t_96600ea4877faa 1-47,49-50,56-78,92-151
+  s_13674d577983e8::t_0ea4228abcbb18 83-91
+  s_13674d577983e8::t_4f8144a77b52b4 79-82
+  s_13674d577983e8::t_2844e8be0c1286 48,51-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "6aea67741e66e56b035c79904133b46e6fb72d79",
+  "prompts": {},
+  "sessions": {
+    "s_13674d577983e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec68cad7-2923-4d50-9108-53f8182a56b9",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
