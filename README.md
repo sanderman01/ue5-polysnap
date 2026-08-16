@@ -79,12 +79,45 @@ Each edge socket defines an orthonormal basis:
 Mating two edge sockets means:
 
 1. Their positions coincide.
-2. Their tangents are collinear and opposed (`Tangent_A == -Tangent_B`), which keeps panel
-   winding consistent and prevents mirrored assemblies.
+2. Their tangents are collinear — `Tangent_B == ±Tangent_A`.
 
-That leaves **exactly one degree of freedom**: rotation about the shared edge axis. That
-scalar is the **dihedral angle** between the two panels — measured through the structure's
-interior, so 180° means the panels are coplanar and smaller values fold them inward.
+That leaves **exactly one continuous degree of freedom**: rotation about the shared edge axis.
+That scalar is the **dihedral angle** between the two panels — measured through the
+structure's interior, so 180° means the panels are coplanar and smaller values fold them
+inward.
+
+#### Flipping — the two discrete solutions
+
+The `±` in the tangent condition is a genuine choice, not slack in the constraint. With a
+right-handed basis (`Outward × Tangent = Normal`), the two cases are:
+
+- **`Tangent_B == -Tangent_A`** — the panels' normals land on the same side. Surface
+  orientation is consistent across the joint.
+- **`Tangent_B == +Tangent_A`** — piece B's normal is reversed; its outward face now points
+  into the structure.
+
+The second case is **not** a mirror image. It is a proper 180° rotation of the piece about its
+socket's Outward axis, which reverses tangent and normal together and leaves chirality
+untouched. It is a motion the player can physically perform by turning the panel over, so it
+is permitted by default.
+
+Consequences:
+
+- **Mating is two-valued.** Each socket pair yields two candidate transform families, each
+  with its own dihedral DOF. The snapper resolves this by choosing the admissible solution
+  requiring the **least rotation from the piece's current orientation** — the player turns the
+  piece roughly the way they want it and the snap commits to that reading. No explicit flip
+  control is needed.
+- **Flip admissibility is a per-socket property.** A blank symmetric hull panel should flip
+  freely. A piece with a distinguished interior face — a hatch with a mechanism, a panel with
+  equipment rails or interior trim — must not. Sockets declare which polarities they accept,
+  and the permitted dihedral range may differ between them.
+- **Flipping relocates attachment sockets** (§2.2) from the hull interior to the exterior.
+  This is usually the real reason a piece forbids flipping, and it is a gameplay consequence
+  rather than a geometric detail.
+- **Surface orientation is no longer globally guaranteed.** Where normals carry meaning,
+  inside/outside must be derived from the enclosed volume rather than assumed from panel
+  normals (§7).
 
 This is why the "permissible angles" metadata is tractable: it constrains one number, not an
 orientation. A socket pair that permits a single dihedral value yields a **rigid** joint; a
@@ -98,9 +131,15 @@ A candidate connection is evaluated as:
 1. **Type and size match** — a large hex edge does not mate with a small pent edge. Cheap
    rejection first.
 2. **Proximity** — socket positions within a tolerance.
-3. **Orientation** — tangents opposable within a tolerance.
-4. **Dihedral admissibility** — the resulting angle lies within both sockets' permitted range.
-5. **Occupancy** — neither socket is already connected.
+3. **Orientation** — tangents collinear within a tolerance, in either polarity.
+4. **Flip admissibility** — for each polarity, whether both sockets permit it (§2.3).
+5. **Dihedral admissibility** — the resulting angle lies within both sockets' permitted range
+   *for that polarity*.
+6. **Occupancy** — neither socket is already connected.
+
+Steps 4 and 5 are evaluated per polarity, so a socket pair can yield zero, one, or two
+admissible solutions. Where both are admissible, the snapper picks the one requiring least
+rotation from the piece's current orientation.
 
 When a candidate passes, the piece is snapped: its transform is solved from the target
 socket's basis so that the mating conditions hold exactly, rather than approximately. Snapping
@@ -238,7 +277,9 @@ Marked explicitly so nobody builds on them as though they were settled.
 - **Weld merge mechanics.** Which merge strategy preserves reversibility at acceptable cost.
 - **Enclosure algorithm.** How enclosure is actually determined — graph cycle analysis, or a
   geometric test — and how it handles hatches, which are openable holes in an otherwise
-  sealed surface.
+  sealed surface. Because flipping is permitted (§2.3), panel normals cannot be assumed to
+  agree on which side is "inside"; if the algorithm needs an inside/outside distinction it
+  must derive it from the enclosed volume.
 - **Tolerances.** Snap distance and angular thresholds; whether they are global, per socket
   type, or scaled by piece size.
 - **Framework choices.** Enhanced Input, GAS, StateTree, and similar are undecided and will be
