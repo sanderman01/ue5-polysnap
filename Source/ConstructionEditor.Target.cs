@@ -1,0 +1,15 @@
+// Copyright (c) 2026, Alexander Verbeek. All rights reserved.
+
+using UnrealBuildTool;
+using System.Collections.Generic;
+
+public class ConstructionEditorTarget : TargetRules
+{
+	public ConstructionEditorTarget(TargetInfo Target) : base(Target)
+	{
+		Type = TargetType.Editor;
+		DefaultBuildSettings = BuildSettingsVersion.V7;
+
+		ExtraModuleNames.AddRange( new string[] { "Construction" } );
+	}
+}
