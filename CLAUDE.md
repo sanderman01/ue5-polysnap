@@ -5,6 +5,10 @@ Where the two overlap, this file wins.
 
 ## What this project is
 
+See [README.md](README.md) for the design: what the game is, how the PolySnap node-based
+snapping system works, and which questions are still open. Read it before doing design work.
+
+
 A first-person space building/sandbox project used as an **incubator for reusable plugin
 modules**. The eventual product is not this project — it is the plugins developed here,
 which will be dropped into a real game project later. Also a deliberate learning vehicle for
