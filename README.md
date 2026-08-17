@@ -3,9 +3,10 @@
 A game about building pressurised structures in microgravity, in orbit — and, more
 immediately, a testbed for the reusable plugin modules that game will be built from.
 
-Unreal Engine 5.8, Linux. See [CLAUDE.md](CLAUDE.md) for working conventions (build commands,
-code style, plugin isolation rules). This document describes *what* we are building and *why*;
-CLAUDE.md describes *how* to work on it.
+Unreal Engine 5.8, Linux. This document describes *what* we are building and *why*.
+[CLAUDE.md](CLAUDE.md) describes *how* to work on it (build commands, code style, plugin
+isolation rules), and [CONVENTIONS.md](CONVENTIONS.md) pins down the mechanical conventions
+shared between Blender and Unreal — axes, units, and exact import/export settings.
 
 ---
 
@@ -118,7 +119,7 @@ An abstract size vocabulary (`Straight_S`, `Straight_M`) would avoid rounding bu
 a glance, and reintroduces a centrally maintained vocabulary of the kind removed when angles
 became emergent (§2.4).
 
-**Why `SubType` and `Size` stay separate fields** rather than a fused `Straight200`: splitting
+**Why `SubType` and `Size` stay separate fields** rather than a fused `Straight2000`: splitting
 a fused token requires scanning for the alpha/digit boundary, which breaks as soon as a subtype
 name contains a digit; and a subtype with two parameters — as curves will have — cannot be
 expressed as "name plus one number" at all. The compatibility key is the tuple either way.
@@ -162,6 +163,12 @@ Each edge socket defines an orthonormal basis:
 - **Tangent** — along the edge.
 - **Normal** — the panel's surface normal. Which of the panel's two faces this points to is an
   arbitrary authoring convention; it does **not** mean "outside of the structure" (§2.6).
+
+Which local axis carries which role — `Outward` is socket-local **+X**, `Tangent` **+Y**,
+`Normal` **+Z** — is fixed in [CONVENTIONS.md](CONVENTIONS.md), together with the Blender
+authoring recipe and the export settings that make the two agree. That mapping is a convention,
+not a design decision; this section only depends on the three directions existing and being
+orthonormal.
 
 Mating two edge sockets means:
 
