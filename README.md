@@ -252,11 +252,12 @@ Each edge socket defines an orthonormal basis:
 - **Normal** — the panel's surface normal. Which of the panel's two faces this points to is an
   arbitrary authoring convention; it does **not** mean "outside of the structure" (§2.6).
 
-Which local axis carries which role — `Outward` is socket-local **+X**, `Tangent` **+Y**,
-`Normal` **+Z** — is fixed in [CONVENTIONS.md](CONVENTIONS.md), together with the Blender
-authoring recipe and the export settings that make the two agree. That mapping is a convention,
-not a design decision; this section only depends on the three directions existing and being
-orthonormal.
+Which local axis carries which role — in Unreal, `Outward` is socket-local **+X**, `Tangent`
+**−Y**, `Normal` **+Z** — is fixed in [CONVENTIONS.md](CONVENTIONS.md), together with the
+Blender authoring recipe and the export settings that make the two agree. Note the sign:
+`Tangent` is the socket's **−Y**, so every expression below means that derived vector, never
+`GetUnitAxis(EAxis::Y)`. The mapping is a convention, not a design decision; this section only
+depends on the three directions existing and being orthonormal.
 
 Mating two edge sockets means:
 
@@ -292,9 +293,10 @@ Two things this sign is not:
 
 #### Flipping — the two discrete solutions
 
-The `±` in the tangent condition is a genuine choice, not slack in the constraint. Taking
-`Outward ^ Tangent == Normal` as Unreal's code sees it (CONVENTIONS §2 — the sign flips in
-Blender, and the argument below holds either way), the two cases are:
+The `±` in the tangent condition is a genuine choice, not slack in the constraint. The triad is
+right-handed as a physical arrangement, so `Outward × Tangent == Normal` — the sign is inverted
+in Unreal's cross product (CONVENTIONS §2) and the argument below holds either way. The two
+cases are:
 
 - **`Tangent_B == -Tangent_A`** — the panels' normals land on the same side. Surface
   orientation is consistent across the joint.

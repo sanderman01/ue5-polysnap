@@ -27,15 +27,10 @@ FBX          200.0       (centimetres)
 Unreal       200.0 uu
 ```
 
-**The FBX is written in centimetres, not metres.** Centimetres are FBX's native unit, and
-Unreal reads the numbers in the file as centimetres directly — it does not scale them by any
-unit metadata. Blender's **Apply Unit** export setting (§4) is what performs the metre-to-
-centimetre conversion on the way out, which is why turning it off is the classic "everything
-imported 100× too small" bug: 2.0 goes out as `2.0` and arrives as 2 cm.
-
-The practical consequence is that **no second unit conversion may be enabled anywhere** — see
-Convert Scene Unit in §5. The chain above has exactly one scaling step in it, and §7's first
-calibration check is there to confirm that.
+Default Blender scene settings with default export and import settings (§4, §5) put exactly
+**one** scaling step in that chain: Blender's export, converting metres to FBX's centimetres.
+Nothing else may scale. A panel that imports 100× too small or too large means a second
+conversion is switched on somewhere; §7's first check confirms this once.
 
 `Size` is compared for equality and nothing else (README §2.2). The one place these units are
 related is the import-time validator (§6).
@@ -47,41 +42,37 @@ related is the import-time validator (§6).
 The load-bearing convention. README §2.3 names the three directions; here is which axis each
 one *is*.
 
-| Role | Unreal socket local | Blender empty local | Meaning |
+| Role | Blender empty local | Unreal socket local | Meaning |
 | --- | --- | --- | --- |
-| **Outward** | **+X** (Forward) | **−Y** | In the panel plane, perpendicular to the edge, away from the piece's centre. |
-| **Tangent** | **+Y** (Right) | **−X** | Along the edge. |
-| **Normal** | **+Z** (Up) | **+Z** | The panel's surface normal. Arbitrary which face; see README §2.6. |
+| **Outward** | **+X** | **+X** (Forward) | In the panel plane, perpendicular to the edge, away from the piece's centre. |
+| **Tangent** | **+Y** | **−Y** | Along the edge. |
+| **Normal** | **+Z** | **+Z** (Up) | The panel's surface normal. Arbitrary which face; see README §2.6. |
 
-**Outward takes +X** because every Unreal system that consumes a socket transform assumes a
-thing points along its local +X. Tangent and Normal then fall into Right and Up.
+**The Blender column is chosen for ease of authoring.** An empty with zero rotation is already
+a valid socket on the piece's +X edge, so authoring a socket is "place it, then yaw about Z"
+and nothing else.
+
+The Unreal column is what that becomes after import: the conversion negates Y — that is how a
+right-handed Blender basis is expressed in Unreal's left-handed one — so **Tangent lands on
+−Y**. Outward keeping +X is the part that matters at runtime, because every Unreal system that
+consumes a socket transform assumes a thing points along its local +X.
+
+**Tangent is −Y, not +Y.** Derive it through the sign, or every polarity test in the snapper
+runs backwards:
 
 ```cpp
 const FTransform Socket = Mesh->GetSocketTransform(SocketName, RTS_Component);
 const FVector Outward = Socket.GetUnitAxis(EAxis::X);
-const FVector Tangent = Socket.GetUnitAxis(EAxis::Y);
-const FVector Normal  = Socket.GetUnitAxis(EAxis::Z);   // == Outward ^ Tangent
+const FVector Tangent = -Socket.GetUnitAxis(EAxis::Y);
+const FVector Normal  = Socket.GetUnitAxis(EAxis::Z);   // == Tangent ^ Outward
 ```
 
-Unreal's *coordinate system* is left-handed, but `FVector::CrossProduct` is the standard
-right-hand formula, so `X ^ Y == Z` is what the code sees — README §2.3's relation needs no sign
-corrections anywhere in Unreal.
-
-**It does need one in Blender.** The physical triad here — face along Outward, right hand along
-Tangent, head along Normal — is left-handed, exactly like Unreal's (Forward, Right, Up). Unreal
-hides that by pairing a left-handed coordinate system with a right-handed cross product, so the
-two inversions cancel. Blender's coordinate system is genuinely right-handed and nothing
-cancels, so the same socket satisfies
-
-```
-Blender:   Outward × Tangent == −Normal      (−Y) × (−X) == −Z
-Unreal:    Outward ^ Tangent == +Normal      (+X) ^ (+Y) == +Z
-```
-
-Both describe the identical physical arrangement. Anyone porting README §2.3's relation into a
-Blender-side sanity script without flipping the sign will reject correct assets — this is the
-only place in the pipeline where the handedness difference is visible to a human rather than
-absorbed by the exporter.
+That last comment is the other consequence. The triad is right-handed as a *physical*
+arrangement, so `Outward × Tangent == +Normal` in Blender, where the coordinate system is
+right-handed too. Unreal's coordinate system is left-handed while `FVector::CrossProduct` is
+the plain right-hand formula, so the identical socket computes as
+`Outward ^ Tangent == −Normal` there. Unreal code that needs Normal from the other two writes
+`Tangent ^ Outward`; code that reads `EAxis::Z` directly is unaffected.
 
 **Socket scale is always 1.** PolySnap reads rotation and translation only.
 
@@ -93,14 +84,12 @@ panel's plane the other landed on, and means nothing about inside or outside.
 
 ### The authoring mental model
 
-The Blender column's double negatives are hard to remember. Use one picture instead:
-
 > The empty is a **person standing on the panel at the middle of the edge**, feet on the surface
-> (head along **Normal**), facing off the edge away from the panel (**Outward**). Their right
+> (head along **Normal**), facing off the edge away from the panel (**Outward**). Their **left**
 > hand points along the edge (**Tangent**).
 
-That person faces −Y in Blender — the direction a model faces in front view — and +X in Unreal.
-Same person, both applications.
+That person faces +X in both applications. Their left hand is Blender's +Y and Unreal's −Y —
+same hand, same physical direction, opposite sign.
 
 ---
 
@@ -141,7 +130,8 @@ snap math.
 
 ### Optional: the canonical piece frame
 
-> **Socket `001`'s Outward points along the piece's local +X.**
+> **Socket `001`'s Outward points along the piece's local +X** — that is, socket `001`'s empty
+> has zero rotation (§2).
 
 This makes a piece's authored frame deterministic: panels of the same type become directly
 comparable and rotational variants trivial to diff. Without it, a piece's yaw about its own
@@ -204,59 +194,47 @@ drops the empties **succeeds silently** (§4).
 
 ---
 
-## 4. Blender FBX export settings
+## 4. Blender scene and FBX export settings
 
-Blender 4.x, `File → Export → FBX (.fbx)`. Unlisted fields stay at their defaults.
+**Default Blender scene settings, and default FBX exporter settings** (`File → Export →
+FBX (.fbx)`, Blender 4.x). The defaults produce §1's unit chain and §2's axis table; the
+Transform section is where changing a field silently breaks one or the other, so leave
+**Forward −Z / Up Y**, **Apply Unit on** and **Apply Transform off** exactly as they come. Apply
+Transform in particular rewrites object transforms on the way out, and a socket empty *is* an
+object transform (§3).
 
-| Section | Setting | Value | Why |
-| --- | --- | --- | --- |
-| Include | Limit to **Selected Objects** | on | |
-| Include | **Object Types** | Mesh + Empty | **Mandatory** — without Empty there are no sockets and the import silently succeeds. |
-| Include | Custom Properties | off | Metadata lives in the socket name. |
-| Transform | Scale | 1.00 | |
-| Transform | Apply Scalings | All Local | Default. |
-| Transform | **Forward** | **−Z Forward** | Default. Do not change — §2's axis table is derived from it. |
-| Transform | **Up** | **Y Up** | Default. Same. |
-| Transform | **Apply Unit** | **on** | Converts Blender's metres into FBX's centimetres (§1). Off is the classic "everything is 100× too small" bug. |
-| Transform | **Apply Transform** | **off** | Rewrites object transforms on the way out — exactly what a socket empty consists of. |
-| Geometry | Smoothing | Face | Unreal wants explicit smoothing groups. |
-| Geometry | Apply Modifiers | on | |
-| Geometry | Tangent Space | on | Needed for normal-mapped panels. |
-| Geometry | Loose Edges | off | |
-| Armature | Bake Animation | off | Static meshes only. |
+Two things the defaults do not decide:
 
-Every "my sockets are rotated 90°" report traces back to the two Transform axis fields or to
-Force Front X Axis (§5).
+- **The export must contain the empties.** Object Types defaults to all types, which is
+  correct — but an export that drops them **succeeds silently** and lands a panel with no
+  sockets at all.
+- **One file per piece.** With a panel family in one `.blend` (§3), either tick **Limit to
+  Selected Objects** or use **Batch Mode → Collection**, which fits the one-collection-per-piece
+  rule. Neither touches axes or units; batch mode's interaction with the rest is unconfirmed, so
+  check it on the calibration asset (§7) before relying on it.
 
 ---
 
 ## 5. Unreal import settings
 
-Static mesh import. Unlisted fields stay at their defaults.
+**Use the default import pipeline** — UE 5.8's Interchange FBX pipeline, settings untouched.
+Convert Scene on, Convert Scene Unit off, Force Front X Axis off, Import Uniform Scale 1.0 and
+Transform Vertex to Absolute on are all defaults, and together they are what §1 and §2
+describe.
 
-| Setting | Value | Why |
-| --- | --- | --- |
-| Skeletal Mesh | off | |
-| Combine Meshes | off | One panel, one asset. |
-| Import Uniform Scale | 1.0 | The file is already in centimetres (§1). Nothing here needs scaling. |
-| **Convert Scene Unit** | **off** (default) | Would rescale by the file's unit metadata — a second conversion on top of Blender's Apply Unit. The chain in §1 has exactly one scaling step and this is how it stays that way. |
-| Convert Scene | on | Performs the FBX→Unreal axis conversion §2's table assumes. |
-| **Force Front X Axis** | **off** | Adds a 90° yaw to everything, invalidating §2's axis table. |
-| Auto Generate Collision | off | Panels need authored collision; a generated hull will not respect an edge profile (README §2.4). |
-| **Transform Vertex to Absolute** | **on** (default) | Bakes the FBX node transform into the vertices. Harmless when every piece is authored at identity, and the reason §3 insists on it. |
+Two consequences of the defaults are worth naming:
 
-**Transform Vertex to Absolute** is what makes §3's "stack every piece at the origin" rule
-mandatory rather than merely tidy. Turning it off would import each mesh relative to its own
-pivot and so permit pieces laid out side by side in Blender, but it changes how every asset
-imports and interacts with Combine Meshes. That is not a blast radius worth accepting to buy
-viewport convenience: leave it on and author at identity.
+- **Transform Vertex to Absolute bakes the FBX node transform into the vertices.** Harmless
+  when every piece is authored at identity, and the reason §3 insists on it rather than merely
+  recommending it.
+- **Auto-generated collision is the one thing to switch off** per asset. Panels need authored
+  collision; a generated hull will not respect an edge profile (README §2.4). That is a content
+  decision, not a change to the pipeline.
 
 Unreal creates static mesh sockets from FBX nodes prefixed `SOCKET_`, stripping the prefix
 (README §2.2). The node must be an FBX null, which is what a parented Blender empty produces.
-
-**UE 5.8 uses Interchange for FBX import by default.** The legacy importer's socket handling is
-well documented; Interchange's is the thing to confirm on the calibration asset (§7). If it
-diverges, the legacy path is still available via Project Settings → Interchange.
+Interchange's handling of socket names — specifically the authoring tail — is confirmed on the
+calibration asset (§7).
 
 ---
 
@@ -315,11 +293,11 @@ any panel is authored in bulk. That is the right place for it.
 
 ## 7. Calibration
 
-Several things here are derived from how the Blender exporter and the Unreal importer compose
-rather than from anything either one documents, and should be **confirmed once on a throwaway
-asset before panels are authored in bulk**: §2's axis mapping, Interchange's socket handling
-(§5), and how both treat an authoring tail. Every later asset inherits whatever is actually
-true, so the cost of not checking is a re-export of the entire panel set.
+Run this **once on a throwaway asset before panels are authored in bulk**. It confirms that the
+pipeline in §4 and §5 is actually set up as described, and pins down the two things nothing
+here specifies: Interchange's treatment of an authoring tail, and batch export. Every later
+asset inherits whatever is actually true, so the cost of not checking is a re-export of the
+entire panel set.
 
 ### The asset
 
@@ -327,24 +305,21 @@ Specified exactly, so every check below has a number to compare against rather t
 impression:
 
 > A **square panel, 2000 × 2000 × 40 mm**, centred on the Blender origin and lying in the XY
-> plane. One empty named `SOCKET_Edge_001_Straight_2000`, placed at Blender **`(0, −1.0, 0)`** —
-> the midpoint of the −Y edge — with **zero rotation**.
+> plane. One empty named `SOCKET_Edge_001_Straight_2000`, placed at Blender **`(1.0, 0, 0)`** —
+> the midpoint of the +X edge — with **zero rotation**.
 
-Zero rotation is the point of the design. An empty with no rotation of its own has local −Y
-along global −Y, which §2's table says is Outward, and −Y is the edge the socket sits on. So any
-rotation the socket shows in Unreal came from the axis conversion and nothing else, which is
-precisely what is being calibrated. Author per §3, export per §4, import per §5.
+Zero rotation is the point of the design: §2's Blender column makes an unrotated empty a correct
+socket for the +X edge, so anything the socket shows in Unreal other than what check 3 states
+came from the pipeline and nothing else. Author per §3, export per §4, import per §5.
 
 ### The checks
 
 1. **Scale.** The mesh bounds read **200 × 200 × 4 uu**.
-2. **Socket position.** The socket sits at **`(100, 0, 0)`** in the static mesh editor. This is
-   the whole axis table in one number: Blender `(0, −1.0, 0)` is one metre along Blender −Y,
-   which §2 maps to Unreal +X at 100 uu. A socket at `(0, −100, 0)` or `(0, 100, 0)` means the
-   conversion is not what §2 assumes.
-3. **Socket axes.** Its rotation is **identity** — the gizmo's **red (+X)** arrow points away
-   from the panel in its plane, **green (+Y)** runs along the edge, **blue (+Z)** is the surface
-   normal.
+2. **Socket position.** The socket sits at **`(100, 0, 0)`** in the static mesh editor — Blender
+   `(1.0, 0, 0)` is one metre along +X, which is 100 uu along Unreal +X.
+3. **Socket axes.** Its rotation is **identity**, and the gizmo reads: **red (+X)** points away
+   from the panel in its plane (Outward), **green (+Y)** runs along the edge — its **negative**
+   is Tangent (§2) — and **blue (+Z)** is the surface normal.
 4. **Round trip, by hand.** This one needs no code. Place instance A at the world origin, and
    instance B at **`(200, 0, 0)` with yaw 180°**. Their sockets now coincide at `(100, 0, 0)`
    with opposed Outwards and reversed Tangents — a coplanar 180° seam, and the two panels should
@@ -358,12 +333,12 @@ precisely what is being calibrated. Author per §3, export per §4, import per �
    socket, and PolySnap ignores it without a diagnostic (README §2.2). Confirms the plugin can
    share a mesh with another system, which is the whole basis for equipment living elsewhere.
 7. **Batch export.** Blender's FBX exporter has a **Batch Mode → Collection** that writes one
-   file per collection, which is the natural fit for §3's one-collection-per-piece rule. It is
-   absent from §4's table because its interaction with *Limit to Selected Objects* and the
-   Transform axis fields is unconfirmed. Check it here; if it behaves, add it to §4.
+   file per collection, the natural fit for §3's one-collection-per-piece rule. Its interaction
+   with *Limit to Selected Objects* is unconfirmed (§4); check it here, and if it behaves, use
+   it.
 
 If (1) fails, a second unit conversion is switched on somewhere — check Apply Unit (§4) and
 Convert Scene Unit (§5) before touching anything else.
 
-If (2) or (3) fails, §2's **Blender** column needs correcting, not the Unreal column: the Unreal
-roles come from engine convention and stay as they are.
+If (2) or (3) fails, a Transform field in the exporter or the import pipeline has been changed
+from its default. §2's table is not the thing to adjust.
