@@ -91,3 +91,11 @@ Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+# Agent tooling — all generated, all machine-local
+# clangd compile database, emitted by UBT -mode=GenerateClangDatabase
+compile_commands.json
+.clangd
+.cache/
+# Unreal MCP client config, emitted by ModelContextProtocol.GenerateClientConfig
+.mcp.json
