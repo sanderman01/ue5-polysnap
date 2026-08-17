@@ -4,9 +4,10 @@ A game about building pressurised structures in microgravity, in orbit — and, 
 immediately, a testbed for the reusable plugin modules that game will be built from.
 
 Unreal Engine 5.8, Linux. This document describes *what* we are building and *why*.
-[CLAUDE.md](CLAUDE.md) describes *how* to work on it (build commands, code style, plugin
-isolation rules), and [CONVENTIONS.md](CONVENTIONS.md) pins down the mechanical conventions
-shared between Blender and Unreal — axes, units, and exact import/export settings.
+[CLAUDE.md](CLAUDE.md) describes *how* to work on it — the architecture rules, and where the
+rest is written down. [CODE_STYLE.md](CODE_STYLE.md) governs the C++, and
+[CONVENTIONS.md](CONVENTIONS.md) pins down the mechanical conventions shared between Blender
+and Unreal — axes, units, and exact import/export settings.
 
 ---
 

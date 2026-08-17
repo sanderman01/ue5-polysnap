@@ -3,11 +3,17 @@
 Supplements `~/AGENTS.md`. This file covers only what is specific to this project.
 Where the two overlap, this file wins.
 
+## Where things are written down
+
+| Document | Covers |
+| --- | --- |
+| [README.md](README.md) | The design: what the game is, how the PolySnap node-based snapping system works, which questions are still open. Read it before doing design work. |
+| [CONVENTIONS.md](CONVENTIONS.md) | The Blender↔Unreal contract: axes, units, socket basis, exact import/export settings. |
+| [CODE_STYLE.md](CODE_STYLE.md) | How the C++ is written: Epic's standard, modern C++, lifetime rules, Blueprint API hygiene. Read it before writing code. |
+| `unreal-build` skill | Building a target, the editor guard, regenerating project files. |
+| `automation-tests` skill | What gets a test, where it lives, how to run it. |
+
 ## What this project is
-
-See [README.md](README.md) for the design: what the game is, how the PolySnap node-based
-snapping system works, and which questions are still open. Read it before doing design work.
-
 
 A first-person space building/sandbox project used as an **incubator for reusable plugin
 modules**. The eventual product is not this project — it is the plugins developed here,
@@ -44,107 +50,22 @@ C++ class with a deliberate Blueprint-facing surface.
 Framework choices (Enhanced Input, GAS, StateTree, Mass, subsystems) are undecided — raise
 them per feature rather than assuming a stack.
 
-## Building
+## Building and testing
 
-The editor is often open. **Before any command-line build, check for a running editor:**
+Use the **`unreal-build`** skill for anything that compiles, and the **`automation-tests`**
+skill before writing a test. Two rules that must hold even if you never open them:
 
-```sh
-pgrep -af "[U]nrealEditor .*Construction.uproject"
-```
-
-The bracket around `U` stops the check from matching its own shell command line — without it
-the check always reports a false positive. Exit code 1 and no output means nothing is running.
-
-If the editor is running, stop and ask the user to close it — the build cannot overwrite the
-loaded module `.so`. **Never kill the editor process.**
-
-With the editor closed:
-
-```sh
-# from the project root
-make ConstructionEditor          # ConstructionEditor-Linux-Development
-```
-
-or directly:
-
-```sh
-/home/sander/UnrealEngine_5_8_1/Engine/Build/BatchFiles/Linux/Build.sh \
-  ConstructionEditor Linux Development \
-  -Project="/home/sander/dev/unreal/Construction/Construction.uproject"
-```
-
-After adding, removing, or renaming a module or plugin, regenerate project files:
-
-```sh
-/home/sander/UnrealEngine_5_8_1/Engine/Build/BatchFiles/Linux/GenerateProjectFiles.sh \
-  -project="/home/sander/dev/unreal/Construction/Construction.uproject" -game -engine
-```
-
-A build is not "done" until it compiles clean. `Target is up to date` means nothing was
-compiled — that is not a verification. Report the actual UBT output on failure, do not
-paraphrase it. Launching the editor and playing the level is the user's job.
-
-Both targets set `IncludeOrderVersion = EngineIncludeOrderVersion.Latest`. Epic's template
-leaves this field unset, which silently resolves to `Oldest` (= `Unreal5_6` in 5.8) and makes
-engine headers backfill transitive includes that newer UE removed. Strict order is deliberate
-here: it enforces the IWYU rule and stops a plugin from compiling only because of includes a
-target project may not provide. Do not relax it to silence an include error — add the missing
-`#include` instead.
-
-Note that `Latest` auto-advances on engine upgrade, so an engine integration may surface new
-include errors. That is the intended tradeoff; fix the includes.
-
-## Testing
-
-Automation Spec tests **only for pure/algorithmic code** — logic that runs without a world
-(math, grid/placement rules, serialization, data transforms). Put them in the plugin's own
-`Tests/` folder in a module that is not shipped with the runtime target. Everything that
-needs a world, actors, or rendering is verified by the user playing the level.
-
-Do not write tests for world-dependent systems unless asked. Do not write ad-hoc throwaway
-test executables.
+- **Never kill the editor process.** A command-line build cannot overwrite a module `.so` the
+  running editor has loaded, so check `pgrep -af "[U]nrealEditor .*Construction.uproject"`
+  first and ask the user to close it.
+- **Automated tests are for pure/algorithmic code only.** Anything needing a world, actors, or
+  rendering is verified by the user playing the level — do not write tests for it unless asked.
 
 ## Code style
 
-**Epic's coding standard, strictly.** This is non-negotiable and outranks personal taste:
-
-- Prefixes: `F` structs, `U` UObjects, `A` Actors, `E` enums, `T` templates, `I` interfaces,
-  `S` Slate widgets. PascalCase everywhere; `b` prefix for bools (`bIsPlacing`).
-- Tabs for indentation, Allman braces — match the existing template files.
-- IWYU includes; the `.generated.h` include is always last. No `using namespace`.
-- One class per header where reasonable; keep implementation in `.cpp`.
-- Copyright header on every new file: `// Copyright (c) 2026, Alexander Verbeek. All rights reserved.`
-- Per-plugin `UE_LOG` category, declared in the plugin's module header.
-
-**Modern C++ where the engine allows it** — but never at the cost of Epic conventions, and
-never STL containers in place of UE ones (`TArray`/`TMap`/`TSet`/`FString`, not
-`std::vector`/`std::string`):
-
-- `const` correctness by default, including `const` member functions and `const TArray<T>&` params
-- `TObjectPtr<T>` for UPROPERTY object members; raw pointers only for locals/params
-- Ranged-for, structured bindings, `if`-with-initializer, `constexpr`, `[[nodiscard]]`
-- `MoveTemp` (not `std::move`), `TOptional`, `TVariant`, `TFunction`
-- `enum class` over plain enums; `static_assert` over comments about invariants
-
-**Memory and lifetime, explicitly:**
-
-- Every UObject reference held by a UObject is `UPROPERTY()` — no exceptions, or the GC eats it
-- `TWeakObjectPtr<T>` for non-owning references that may outlive the target
-- `TSharedPtr`/`TSharedRef`/`TUniquePtr` for non-UObject types; no raw `new`/`delete`
-- `check()` for programmer errors that must never happen, `ensure()` for recoverable
-  invariants worth a callstack, `verify()` when the expression must still run in shipping.
-  Validate designer-supplied data with `IsValid()` and a log, not a crash.
-
-**Blueprint-facing API hygiene** — the exposed surface is the plugin's public contract:
-
-- Deliberate specifiers: `EditDefaultsOnly` for class-level tuning, `EditAnywhere` only when
-  per-instance override is genuinely wanted, `VisibleAnywhere` for read-only inspection
-- Every `UPROPERTY`/`UFUNCTION` exposed to Blueprint gets a `Category` and a doc comment
-- `BlueprintPure` only for genuinely side-effect-free, cheap functions
-- `MODULE_API` export only on types Blueprints or other modules actually need; keep the rest
-  internal
-- `BlueprintCallable` is an API commitment — renaming it later breaks user Blueprints
-  silently. Name things carefully the first time.
+See [CODE_STYLE.md](CODE_STYLE.md) — read it before writing C++. Epic's coding standard is
+non-negotiable and outranks personal taste; modern C++ is welcome where it does not conflict
+with it, and never via STL containers in place of UE ones.
 
 ## Assets and config
 
