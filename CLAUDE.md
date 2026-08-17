@@ -148,7 +148,7 @@ never STL containers in place of UE ones (`TArray`/`TMap`/`TSet`/`FString`, not
 
 ## Assets and config
 
-- **Never edit binary assets** (`.uasset`, `.umap`). When a change requires one, give the
+- **Never edit binary assets, unless specifically requested** (`.uasset`, `.umap`). When a change requires one, give the
   user precise in-editor steps and the exact values to set.
 - `Config/Default*.ini` edits are fine (plugin enablement, input, module settings). Keep
   plugin-specific config inside the plugin.
