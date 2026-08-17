@@ -59,77 +59,152 @@ imports FBX nodes prefixed `SOCKET_` as static mesh sockets, stripping the prefi
 remainder of the name is ours to encode metadata in, rather than a parallel data asset that
 could drift out of sync with the mesh.
 
-There are two broad classes of socket:
-
-- **Edge sockets** — at the midpoint of each edge of a panel. These join pieces structurally.
-- **Attachment sockets** — mounting points for equipment, wiring, pipes, and similar. Same
-  underlying primitive, different type namespace; they participate in the graph too, so that
-  systems can ask what a piece has attached to it.
+**PolySnap works on edge sockets and nothing else.** An edge socket sits at the midpoint of an
+edge of a piece and joins pieces structurally; that is the whole of the plugin's subject
+matter. Mounting points for equipment, wiring and pipes are a real requirement of the game but
+not of this plugin — see "Sockets PolySnap does not own" below.
 
 #### The naming grammar
 
 ```
-SOCKET_<Type>_<ID>_<SubType>_<Size>
+SOCKET_Edge_<ID>_<SubType>_<Size>[.<AuthoringTail>]
 
 SOCKET_Edge_001_Straight_2000
+SOCKET_Edge_001_Straight_2000.Pent
 ```
 
-After import the engine strips the prefix, so the socket is named `Edge_001_Straight_2000`.
+After import the engine strips the `SOCKET_` prefix, so the socket is named
+`Edge_001_Straight_2000`.
 
 | Field | Example | Meaning |
 | --- | --- | --- |
 | `SOCKET_` | `SOCKET_` | Required prefix. How Unreal recognises the empty as a socket. |
-| `Type` | `Edge` | What kind of socket. `Edge` is structural; `Attach` is for equipment. Determines how the remaining fields are read. |
+| `Edge` | `Edge` | Required namespace tag. Marks the socket as PolySnap's — see below. Not a variable field; it is always this word. |
 | `ID` | `001` | Identity within the piece. Three digits, zero-padded, `001`–`999`. |
 | `SubType` | `Straight` | Edge geometry. **Only `Straight` is in scope** — curves and circles are a later extension. |
-| `Size` | `2000` | Nominal edge length in **millimetres**. Integers only. A compatibility token, not a measurement — see below. |
+| `Size` | `2000` | Nominal edge length in **millimetres**. Bare integer, no zero-padding, no fixed width. A compatibility token, not a measurement — see below. |
+| `.<Tail>` | `.Pent` | Optional. Everything from the first `.` onward is authoring scratch: ignored by the parser, never identity and never compatibility — see below. |
 
-**`SOCKET_<Type>_<ID>` is a fixed-arity head; everything after it is type-specific and of
-variable arity.** This is why the ID sits third rather than last: when curved edges arrive they
-will need more than one parameter (a radius *and* an arc length), and they can extend the tail
-without disturbing how every socket's identity is parsed.
+**`SOCKET_Edge_<ID>` is a fixed-arity head; everything after it is of variable arity.** This is
+why the ID sits third rather than last: when curved edges arrive they will need more than one
+parameter (a radius *and* an arc length), and they can extend the tail without disturbing how
+every socket's identity is parsed. The `ID` alone is that identity — it is what persistence
+stores (§2.9) and what doubles as network identity (§2.10).
 
-**Compatibility:** two edge sockets may connect only when `Type`, `SubType`, and `Size` all
-match. `Straight_2000` mates only with `Straight_2000`. The `ID` never participates in
-compatibility — it is identity, not classification.
+#### Sockets PolySnap does not own
+
+A static mesh may carry sockets belonging to other systems entirely — an effect anchor, a
+mounting point for equipment, something a future plugin invents. PolySnap has no business
+erroring on those, and the `Edge` tag is how it tells them apart:
+
+> A socket is PolySnap's **only if its name begins `Edge_`** (`SOCKET_Edge_` before import). If
+> it does and the rest fails to parse, that is a loud error — `SOCKET_Edge_01_Straight_2000` is
+> a typo, not a foreign socket. If it does not, the socket is none of PolySnap's business and
+> is passed over in silence.
+
+This is why the tag stays in the name even though it never varies. `SOCKET_001_Straight_2000`
+would work equally well as a format and would give the plugin no way to know whether that
+socket was meant for it.
+
+**Equipment mounting is out of scope**, then — not deferred within PolySnap, but owned by
+whichever plugin ends up responsible for equipment. That plugin brings its own tag and its own
+tail, and the rule above lets both plugins read the same mesh while ignoring each other's
+sockets completely. The grammar here is a reasonable thing for it to copy; the point is that it
+copies rather than shares.
+
+**Compatibility:** two sockets may connect only when `SubType` and `Size` both match.
+`Straight_2000` mates only with `Straight_2000`. The `ID` never participates — it is identity,
+not classification.
+
+That tuple is sufficient **on the assumption that all pieces share a common thickness and edge
+profile**, so that any two edges of equal length meet flush. Nothing in the geometry records
+this and nothing checks it. A thin partition panel authored against a thick hull panel would be
+declared compatible and would mate to a stepped seam that cannot be airtight; if that piece is
+ever wanted, the compatibility key needs a profile term and this paragraph is the warning that
+it was left out deliberately.
+
+**A placed piece is never scaled.** Its actor and component scale are 1, and PolySnap should
+`ensure` on anything else. A panel scaled 1.5× in the level has 3000 mm edges while its
+descriptors still read `2000`, so it snaps to things it cannot meet — a lie the validator
+cannot catch, because the validator inspects the asset and the scale lives on the instance.
 
 #### `Size` is a token, not a measurement
 
 **Nothing in the snap math reads `Size`.** Geometry comes entirely from the socket transforms
 baked into the mesh, which are exact floats; `Size` only answers "may these two edges mate?"
-by equality.
+by equality. It is a category label that happens to be legible.
 
-That matters because **edge lengths are frequently irrational** — diagonal braces are useful
-for structural rigidity, and a regular hexagon of side 2000 has a short diagonal of
-2000√3 ≈ 3464.1 mm. Demanding an integer would restrict the panel set to shapes that happen to
-come out round. Since the rounded token never enters the math, that 0.1 mm is not error but
-*labelling*: author the true geometry, then round to the nearest millimetre for the name.
+Two properties pick the format:
 
-The one real risk is **token collision** — two edges not meant to mate rounding to the same
-integer. Hence millimetres rather than centimetres: at centimetre resolution 346.41 and 346.0
-both become `346`, a plausible 4 mm mismatch wrongly declared compatible.
+- **Integers**, so equality is exact and no float-formatting ambiguity (`346.4` against
+  `346.40`) can reach the token.
+- **Millimetres**, because that is the coarsest unit at which integers still separate any two
+  lengths anyone would plausibly design as *distinct*. At centimetres, `346` swallows everything
+  from 3455 mm to 3465 mm, and two edges never meant to mate are declared compatible.
 
-- **`Size` is not in Unreal units.** UE units are centimetres; this field is millimetres. Never
-  use it as a length in code.
-- **Rounding must be consistent.** Validation should warn when two descriptors differ by one or
-  two units (`Straight_3464` alongside `Straight_3465`), which almost always means two parts
-  rounded the same intended length differently.
+**`Size` is not in Unreal units.** UE units are centimetres; this field is millimetres. Never
+use it as a length in code.
 
-An abstract size vocabulary (`Straight_S`, `Straight_M`) would avoid rounding but is opaque at
-a glance, and reintroduces a centrally maintained vocabulary of the kind removed when angles
-became emergent (§2.4).
+Rounding is therefore free — but only because the true lengths already agree. Edge lengths are
+frequently irrational (a regular hexagon of side 2000 has a short diagonal of
+2000√3 ≈ 3464.1 mm), and two pieces both labelled `3464` are compatible whether their real edges
+match to a nanometre or differ by half a millimetre. The token cannot tell. Hence:
+
+> **Derived lengths are constructed from the geometry they derive from, never typed.** Snap the
+> brace to the hexagon's actual vertices; do not read "3464.1" off a document and type it.
+> Round only for the name.
+
+Typing is what turns a rounded label into a real mismatch, and it is the only way this field
+can hurt you. Authoring a panel family in one `.blend` (CONVENTIONS §3) is what makes
+constructing the cheaper option.
+
+An abstract size vocabulary (`Straight_S`, `Straight_M`) would avoid the rounding question but
+is opaque at a glance, and reintroduces a centrally maintained vocabulary of the kind removed
+when angles became emergent (§2.4).
 
 **Why `SubType` and `Size` stay separate fields** rather than a fused `Straight2000`: splitting
 a fused token requires scanning for the alpha/digit boundary, which breaks as soon as a subtype
 name contains a digit; and a subtype with two parameters — as curves will have — cannot be
 expressed as "name plus one number" at all. The compatibility key is the tuple either way.
 
+#### The authoring tail
+
+**Everything from the first `.` to the end of the name is ignored.** It is not identity, not
+compatibility, and nothing at runtime reads it. `Edge_001_Straight_2000.Pent` and
+`Edge_001_Straight_2000` are the same socket as far as PolySnap is concerned.
+
+It exists because **Blender object names are unique per `.blend` file, not per object**, and
+collections do not namespace them. A hex and a pent authored in the same file therefore cannot
+both own `SOCKET_Edge_001_Straight_2000`; Blender appends `.001` to whichever came second.
+Without a rule for the tail, either every panel needs its own file, or socket IDs have to be
+allocated globally across the whole piece set — a centrally maintained vocabulary of exactly
+the kind this grammar exists to avoid.
+
+Reserving `.` costs nothing. Every field is alphanumeric, so the character is unused, and
+Blender has already claimed it by convention. Prefer a meaningful tail (`.Pent`, `.HatchRim`)
+over letting Blender assign `.001`: a numeric tail sits right next to the three-digit `ID` and
+invites the misreading described below, which is why the validator warns about it.
+
+Because the tail is not identity, renaming `.Pent` to `.Pentagon` is free and does not touch
+save games (§2.9).
+
 #### Field rules
 
-- **`ID` is permanent.** It is what save games store (§2.9), so it must never be renumbered or
-  reused. If a socket is removed, retire its ID rather than reassigning it. Changing a panel's
-  size changes its `Size` field but must leave IDs untouched.
+- **`ID` is permanent, and unique within its piece.** It is what save games store (§2.9), so it
+  must never be renumbered or reused. If a socket is removed, retire its ID rather than
+  reassigning it.
+- **A piece's edge lengths are fixed for the life of the asset.** Resizing an existing panel is
+  not an edit, it is a **new asset**. So socket names never change once authored, and nothing —
+  a save game, a Blueprint reference, an effect attachment — can be broken by a rename that
+  cannot happen.
+- **`ID` is zero-padded to three digits; `Size` is not padded at all.** `Straight_500`, never
+  `Straight_0500` — one size, one spelling. The two fields differ on purpose: `ID` is padded so
+  that Blender's outliner and Unreal's socket manager, both of which sort alphabetically, put
+  `002` before `010`. IDs run past nine on any panel edited a few times, since retired ones are
+  never reused. `Size` has no such ordering to protect and a fixed width would only invite a
+  four-digit assumption that `Straight_500` and `Straight_12000` both break.
 - **No underscores inside a field.** The underscore is the delimiter.
+- **`.` is reserved.** It opens the authoring tail and may not appear inside any field.
 - **Case:** write the prefix as `SOCKET_`. The importer's comparison is case-insensitive, so
   `Socket_` also works, but there is no reason to depend on that.
 
@@ -137,9 +212,15 @@ expressed as "name plus one number" at all. The compatibility key is the tuple e
 
 - **Blender's `.001` duplicate suffix.** Duplicating an empty produces
   `SOCKET_Edge_003_Straight_2000.001` — note the trailing `.001` is Blender's suffix and has
-  nothing to do with the three-digit `ID` field, which is easy to misread. Validation must
-  **reject** this rather than silently stripping the suffix: a duplicated socket also carries a
-  duplicated `ID`, which is a real error the artist has to fix. Auto-stripping would hide it.
+  nothing to do with the three-digit `ID` field, which is easy to misread. It is an authoring
+  tail like any other and is **stripped**, not rejected.
+
+  An earlier version of this document had the validator reject the suffix outright, arguing
+  that a duplicated empty carries a duplicated `ID` and that stripping would hide the error.
+  That was wrong. The suffix is a symptom; the duplicated `ID` is the error, and the error is
+  independently detectable. Strip the tail **first**, then check that no ID repeats on the
+  piece: the duplicated socket still fails, while the legitimate cases — a hex and a pent
+  sharing a file, or a whole piece duplicated to make a variant — pass, as they must.
 - **The empty must export as an FBX null.** The importer only accepts `eNull` (and skeleton)
   attributes, which is what a Blender empty parented to the mesh produces.
 
@@ -147,9 +228,16 @@ expressed as "name plus one number" at all. The compatibility key is the tuple e
 
 Malformed names must fail **loudly at import**, not mysteriously at runtime. This is the job
 of PolySnap's editor module: parse every socket on a piece and report malformed names,
-duplicate IDs, unknown subtypes, and unparseable sizes. It should also warn on near-miss size
-tokens across the piece set, which usually indicate inconsistent rounding of the same intended
-length.
+duplicate IDs, unknown subtypes, and unparseable sizes — all of it per asset, at import.
+Sockets not named `Edge_*` are not PolySnap's and are passed over without comment.
+
+One ordering rule has teeth: **strip the authoring tail before checking ID uniqueness.** The
+other way round, a hex and a pent sharing a `.blend` fail validation for an error neither of
+them has.
+
+Deliberately *not* checked: near-miss size tokens across the piece set (`Straight_3464` beside
+`Straight_3465`). It would need a project-wide asset scan to catch something a failed snap
+reports in two seconds, and the construct-don't-type rule above is the actual fix.
 
 Names are parsed **once** into a struct and cached — never re-parsed per frame, and never
 string-compared during a snap query. Runtime compatibility tests operate on the parsed fields.
@@ -176,14 +264,37 @@ Mating two edge sockets means:
 2. Their tangents are collinear — `Tangent_B == ±Tangent_A`.
 
 That leaves **exactly one continuous degree of freedom**: rotation about the shared edge axis.
-That scalar is the **dihedral angle** between the two panels — measured through the
-structure's interior, so 180° means the panels are coplanar and smaller values fold them
-inward.
+That scalar is the **dihedral angle**, and it is measured in the **anchor socket's own basis**
+(§2.5) — not "through the structure's interior," which does not exist yet and may never (§2.6,
+§2.8):
+
+> **θ is the signed rotation from `Outward_A` to `Outward_B` about `Tangent_A`, over [0°, 360°).**
+>
+> ```
+> θ = atan2( (Outward_A ^ Outward_B) · Tangent_A,  Outward_A · Outward_B )   wrapped to [0, 360)
+> ```
+
+180° is coplanar. θ → 0 and θ → 360 are both the fully-closed configuration, reached from
+opposite sides, so the two halves of the circle are the two folding senses. A signed range is
+necessary rather than tidy: the unsigned angle between the two Outward vectors spans only
+0–180° and so reports θ and 360−θ identically, collapsing concave corners onto convex ones.
+Internal bulkheads and recesses are ordinary shapes, and §2.4 promises to build them.
+
+Two things this sign is not:
+
+- **It is not "toward the inside."** It is deterministic but arbitrary — it flips if a panel is
+  authored with its normal toward the other face. Reproducible, which is what debug readouts,
+  fold limits, and internal maths need; meaningless as a claim about enclosure, which stays
+  §2.8's job.
+- **It is not symmetric between the two panels.** With `Tangent_B == −Tangent_A`, measuring
+  from B's basis returns the same θ; with a flipped panel it returns 360−θ. Naming the anchor
+  as the reference is therefore what makes θ single-valued at all, not a convenience.
 
 #### Flipping — the two discrete solutions
 
-The `±` in the tangent condition is a genuine choice, not slack in the constraint. With a
-right-handed basis (`Outward × Tangent = Normal`), the two cases are:
+The `±` in the tangent condition is a genuine choice, not slack in the constraint. Taking
+`Outward ^ Tangent == Normal` as Unreal's code sees it (CONVENTIONS §2 — the sign flips in
+Blender, and the argument below holds either way), the two cases are:
 
 - **`Tangent_B == -Tangent_A`** — the panels' normals land on the same side. Surface
   orientation is consistent across the joint.
@@ -204,8 +315,9 @@ Consequences:
   control is needed.
 - **Flipping is always permitted.** No socket declares a preferred face and no piece has an
   authored "inside" (§2.6) — a deliberate decision, not an unimplemented check.
-- **Flipping relocates attachment sockets** (§2.2) from the hull interior to the exterior.
-  That is a real and intended gameplay consequence, owned by the player.
+- **Flipping moves whatever is mounted on the panel** from the hull interior to the exterior,
+  and vice versa. PolySnap does not track mounted equipment (§2.2), but the panel it does track
+  is what carries it, so this is a real and intended gameplay consequence, owned by the player.
 - **Surface orientation is not globally guaranteed.** Panel normals do not agree on which
   side is inside, so nothing may treat them as if they do. Inside/outside is derived from the
   enclosed volume (§2.8).
@@ -221,8 +333,14 @@ per-socket range, no authored list of shapes the system knows how to build.
 
 A single connection leaves the dihedral free: the piece is a **hinge**, swinging about the
 shared edge. What removes that freedom is the **next** connection. When a second edge of the
-same piece also mates, the angle is no longer free — it is whatever the geometry requires.
-Three panels closing a vertex determine their dihedrals exactly.
+same piece also mates, that mate *selects* an angle out of the hinge family — the one that
+brings the second socket pair closest together. Three panels closing a vertex select their
+dihedrals to within the accuracy of the panel outlines themselves.
+
+Note the wording: the second mate **selects** the angle, it does not **imply** it. Mating a
+second socket is five constraints — three of position, two of direction — imposed on a
+one-parameter family, so it is over-determined and generically has no exact solution. That is
+not a flaw to engineer around; it is the normal case, and §2.5 is where placement deals with it.
 
 This is why the hex-hex angle of a truncated icosahedron is ~138.19°: not because anyone wrote
 that number down, but because that is what regular hexagons and pentagons closing a vertex
@@ -239,8 +357,18 @@ The consequences are the point:
 
 The only angle limit worth keeping is **mechanical** — an edge profile that would
 self-intersect if folded too far. That is a fact about the mesh, not a design constraint on
-shape, and collision can express it. Treat any such clamp as optional and geometric; never as
-a way of steering the player toward intended shapes.
+shape. Treat any such clamp as optional and geometric; never as a way of steering the player
+toward intended shapes.
+
+**Collision cannot express it**, which is worth stating because it is the obvious guess. Simple
+collision on a simulated body is convex, and a convex hull is exactly what erases the concavity
+of an edge profile — the hull of a chamfered edge is the unchamfered edge. The clamp is better
+found once at import, by measuring the profile, and stored as a derived per-socket value: a
+number the mesh already implies, not metadata anyone authors.
+
+Such a clamp needs only `|180 − θ|`, the fold magnitude. Panels are symmetric about their
+mid-plane (CONVENTIONS §3), so a profile's limit is symmetric about coplanar and the sign of
+§2.3's θ never enters it.
 
 #### Joints: an edge line can host more than two panels
 
@@ -256,32 +384,65 @@ So the graph gains a first-class concept:
 With N sockets on a joint there are N−1 independent dihedral angles about the shared axis, all
 free until further connections constrain them.
 
+**No angle is stored.** Every one is recomputable from the socket transforms, which persistence
+saves anyway (§2.9), so holding them on the joint would be redundant state with its own way of
+going stale. Where an angle is genuinely needed — ordering the participants of a degree-3 joint
+about its axis, for enclosure (§2.8) — derive it then, in the anchor connection's basis (§2.3).
+
 Practically this means **socket occupancy is a capacity question, not a boolean**. "Is this
 socket taken?" becomes "does this joint accept another participant?" — and by default it does.
 
 Note this covers panels sharing a *whole* edge line. A long edge spanned by several shorter
 edges end-to-end is a different problem, and is deliberately **not** solved here (§7).
 
-#### Closing a loop
+#### Subassemblies join to each other, not just pieces to assemblies
 
-With free angles, a ring of panels will rarely close to floating-point exactness. When the
-final socket pair lands within tolerance, **connect, and let the physics constraints absorb
-the residual strain.**
+The player can build two halves and bring them together. This costs almost nothing, because
+**a loose piece is a subassembly of one**: joining a piece to an assembly and joining assembly
+X to assembly Y are the same graph operation, a joint formed between sockets that were in
+different components. And §2.5's anchor-and-adopt rule was built for several socket pairs
+mating at once, which is exactly what two half-domes meeting along a rim produces.
+
+What actually differs:
+
+- **Placement moves a set of bodies.** The anchor still solves one transform; it is applied to
+  every piece in the held subassembly rather than to one.
+- **Residuals are larger.** A rim closure adopts dozens of connections, each carrying error
+  accumulated across half a structure, where a single-piece placement adopts one or two at
+  float noise. The adoption tolerance may have to scale with how much is closing at once (§7).
+- **Weld groups do not merge.** Joining two welded subassemblies leaves two rigid bodies
+  connected by constraints (§2.7). The player welds again if they want one.
+
+The common case needs no joint merging at all: the rim sockets on both halves are free, so the
+operation creates fresh joints and never touches existing ones. Only the case where a joint on
+X and a joint on Y land on the same edge line — four panels arriving as two pre-formed pairs —
+would need joints themselves to merge, and that is left open (§7).
+
+#### Closure is the ordinary case, not the last step
+
+It is tempting to read the previous section as describing a problem that appears only when a
+ring of panels comes back around to meet itself. It is not. **Every connection after a piece's
+first one is a closure** — the last panel of a buckyball is the same operation as the third
+panel at a vertex, differing only in how much geometry accumulated ahead of it.
+
+So the answer is the same in both places. When a socket pair lands within tolerance,
+**connect, and let the physics constraints absorb the residual strain.**
 
 This is nearly free: the constraint solver is already an iterative relaxation solver, so
-letting the assembly settle distributes the error around the loop by itself — what a bespoke
-closure solver would do, without the machinery and without yanking already-placed pieces out
-from under the player. Welding then freezes the settled geometry.
+letting the assembly settle distributes the error by itself — what a bespoke closure solver
+would do, without the machinery and without yanking already-placed pieces out from under the
+player. Welding then freezes the settled geometry, which is the moment that geometry stops
+being the solver's business and becomes durable data (§2.7, §2.10).
 
-This holds **only if per-connection snapping stays exact**. Visible drift when closing a
-buckyball is a bug in the snap transform, not a tolerance to widen. Milestone 2 should measure
-the residual, not eyeball it.
+This holds **only if the anchored connection is exact when it is made** (§2.5). Visible drift
+when closing a buckyball is a bug in the snap transform or in the panel outlines, not a
+tolerance to widen. Milestone 2 measures it rather than eyeballing it (§5).
 
 ### 2.5 Compatibility and snapping
 
 A candidate connection is evaluated as:
 
-1. **Descriptor match** — `Type`, `SubType`, and `Size` all equal (§2.2). `Straight_2000` mates
+1. **Descriptor match** — `SubType` and `Size` both equal (§2.2). `Straight_2000` mates
    only with `Straight_2000`. Cheap integer comparison, so reject on this first.
 2. **Proximity** — socket positions within a tolerance.
 3. **Orientation** — tangents collinear within a tolerance, in either polarity.
@@ -291,13 +452,67 @@ A candidate connection is evaluated as:
 Note what is *absent*: no dihedral check. The resulting angle is whatever the placement
 produces, and remains free until further connections constrain it (§2.4).
 
-Both polarities are always admissible (§2.3), so a passing socket pair yields two candidate
-solutions and the snapper picks the one requiring least rotation from the piece's current
-orientation.
+Both polarities are always admissible (§2.3), so every passing socket pair yields two candidate
+families rather than one solution.
 
-When a candidate passes, the piece's transform is solved from the target socket's basis so the
-mating conditions hold **exactly**, not approximately. Accumulated error is what stops a sphere
-from closing, and a closed buckyball is the acceptance test for this subsystem.
+#### One anchor, many connections
+
+Placement and connection are separate questions, and conflating them is what makes §2.4's
+over-determination look like a contradiction. A piece has **one transform** but may gain
+**several connections** from a single placement. So:
+
+> **Exactly one socket pair is the anchor. The piece's transform is solved from the anchor and
+> from nothing else. Every other socket pair that lands within tolerance after that solve is
+> adopted into its joint, and records the gap it was adopted at.**
+
+The anchor is the pair the player is driving: the passing candidate nearest the held piece by
+the §2.3 least-rotation reading. Its mating conditions then hold to float precision. Every
+adopted connection holds to within whatever the panel geometry actually implies — float noise
+if the outlines are cut correctly, and a measurable error if they are not.
+
+**That exactness describes the moment of placement, not a standing invariant.** In the loose
+regime the solver perturbs everything on the next tick, the anchor included (§2.10). It exists
+so that error is *diagnosable at the instant it is introduced*, which is when the residual is
+recorded; nothing may assert it a frame later.
+
+What the rule buys:
+
+- **No least-squares placement.** A solver that spreads the error across every mating pair
+  leaves *no* connection exact, and exactness on one connection is the invariant that
+  distinguishes a geometry bug from an accumulation artefact.
+- **Determinism.** The transform becomes a pure function of the anchor pair, the polarity, and
+  the dihedral, so a server re-derives it instead of trusting a client transform (§2.10).
+- **A number to measure.** The adoption gap is the residual Milestone 2 is after, and it falls
+  out of ordinary placement rather than needing an instrument built for it.
+
+#### Solving the transform
+
+The anchor pins five of the six degrees of freedom, leaving the dihedral θ about the shared
+edge axis. θ and the polarity are chosen together, by one of two readings:
+
+1. **Adopt-driven.** As the piece hinges, each of its other sockets sweeps a **circle** about
+   the anchor axis. For a candidate target socket the θ bringing the two closest is closed
+   form: decompose the target's offset from the anchor into components along and across the
+   axis, then rotate the held socket's across-axis component onto the target's. One `atan2`, no
+   iteration. The along-axis component does not rotate — **that leftover is the residual.** Run
+   the search over both polarities, take the candidate with the smallest residual, and if it is
+   within tolerance its θ and polarity are the placement.
+2. **Player-driven.** If no secondary candidate is in tolerance, both come from the nearest
+   point on the constraint manifold to the piece's current orientation. The player turns the
+   piece roughly the way they want it and the snap commits to that reading (§2.3).
+
+A secondary socket lying *on* the anchor axis sweeps a degenerate circle and has no θ to offer.
+Detect the near-zero radius and skip it.
+
+#### When a secondary does not fit
+
+**Adopt or drop, per secondary — a failing secondary never rejects the anchor.** The player
+gets the placement they asked for plus an unclosed seam they can see and nudge. Refusing a
+whole placement because a third connection missed by a fraction of a millimetre makes the
+builder feel broken for no gain; the piece is already where the player put it.
+
+Accumulated error is what stops a sphere from closing, and a closed buckyball is the acceptance
+test for this subsystem.
 
 ### 2.6 No authored inside or outside
 
@@ -311,8 +526,8 @@ on the environment the piece ends up in — which is a runtime question the encl
 
 Consequences, which are features rather than costs:
 
-- **Hatches work both ways round.** A hatch is a hole that can be sealed; it does not care
-  which side the pressure is on.
+- **Hatches work both ways round.** A hatch is an ordinary piece with ordinary edge sockets
+  (§2.8), and it does not care which side the pressure is on.
 - **Racks do not care at all**, unless something stored in them needs an atmosphere — and that
   is a property of the stored item, checked at runtime.
 - **Equipment may or may not function as intended** in vacuum versus atmosphere. That is
@@ -335,9 +550,14 @@ The assembly has two regimes:
   long constraint chains are the thing that will otherwise degrade as structures grow.
 
 **Critical invariant:** merging bodies must not merge *identities*. After welding, the graph
-still knows about every individual piece, its sockets, and its connections. The merge is a
-physics-representation optimisation, nothing more. Save/load, airtightness, and disassembly
-all depend on per-piece identity surviving the weld.
+still knows about every individual piece, its sockets, and its connections. Save/load,
+airtightness, and disassembly all depend on per-piece identity surviving the weld.
+
+Welding is also **more than a performance optimisation**, because of what it does to geometry.
+While loose, where a piece sits is the solver's working state — live, strained, and not to be
+relied on. The weld snapshots it, and from that instant those transforms are durable data that
+persistence stores and that nothing recomputes. It is the moment the assembly's shape stops
+being provisional (§2.10).
 
 Unwelding — cutting a structure back apart — should be assumed to be a requirement, and the
 merge implemented so it can be reversed.
@@ -355,11 +575,13 @@ queries:
   "what can I attach here" query. Note a socket already in a joint may still accept more
   panels, so "open" and "available" are different questions.
 - **Enclosure** — which sets of pieces bound a fully closed volume, and are therefore
-  candidates to be treated as **airtight compartments** for atmosphere simulation.
+  candidates to be treated as **airtight compartments** for atmosphere simulation. See below;
+  this is mostly a graph walk, not geometry.
 - **Structural queries** — connectivity, reachability, what breaks off if this piece is cut.
-- **Environment lookup** — which enclosed volume, if any, a given piece or attachment socket
-  sits in. This is what lets equipment decide at runtime whether it is in vacuum or atmosphere
-  (§2.6), instead of that being constrained at build time.
+- **Environment lookup** — which enclosed volume, if any, a given **world position** sits in.
+  Taking a position rather than a socket keeps PolySnap ignorant of what is asking: equipment,
+  a pawn, a dropped item, all use the same query. This is what lets equipment decide at runtime
+  whether it is in vacuum or atmosphere (§2.6), instead of that being constrained at build time.
 
 The boundary: PolySnap reports **topology** — what is connected, what is enclosed. It does not
 model pressure, gas, or temperature. An atmosphere system layered on top consumes these
@@ -367,6 +589,44 @@ queries.
 
 The graph is derived from connections and should be maintained incrementally as pieces are
 added and removed, not rebuilt by scanning the world.
+
+#### Enclosure is a graph walk
+
+Enclosure sounds like it needs geometry — closed volumes, inside versus outside — and almost
+none of it does. Two passes over the graph answer it.
+
+**Peel.** Repeatedly drop any piece with an edge socket in no joint, until nothing changes. A
+free edge is a hole, and dropping a piece exposes its neighbours' edges in turn. What survives
+is boundary-free and is the enclosure candidate. It is a peel rather than a single test because
+a free edge somewhere in a component must not disqualify the whole of it — weld a fin to the
+outside of a finished buckyball and the ball is still sealed.
+
+**Propagate sides.** Every piece has two faces, its +Z and its −Z (CONVENTIONS §3), and §2.3's
+tangent polarity already says how a joint pairs them:
+
+- `Tangent_B == −Tangent_A` — B's +Z is on the same side of the surface as A's +Z.
+- `Tangent_B == +Tangent_A` — B is flipped; its +Z pairs with A's −Z.
+
+So pick any surviving piece, call its +Z "side one," and walk, flipping at every flipped
+connection. Consistent all the way round means the surface is orientable and the two sides are
+a global inside and outside. A contradiction means it is not orientable and bounds nothing.
+
+This is what §2.6's "no authored inside" costs, and it costs nothing: **absolute** facing is
+never needed, only the **relative** facing at each joint, and the snap already decided that.
+
+**A hatch is an ordinary piece.** It has edge sockets, it joins like anything else, and it is
+peeled or kept by the same rule. Whether it happens to be open changes nothing here: a closed
+surface is a claim about topology, not about pressure. The atmosphere system takes PolySnap's
+compartments and unions the ones an open hatch connects — the same division of labour as §2.6,
+one level up. PolySnap says what *bounds* a volume; it never says the volume is sealed.
+
+The one place topology genuinely runs out is a joint of degree three or more. Put a partition
+across a cylinder and every edge is still shared, so the peel keeps everything and the walk
+reports one enclosed region — but a bulkhead exists precisely to make two compartments, and the
+question equipment actually asks is which one it is in. Three panels on an edge line create
+three angular sectors, and deciding which pair bounds which compartment needs their cyclic
+order about the axis. That is an angle, derived on demand (§2.4), and it is the only part of
+enclosure that is not connectivity.
 
 ### 2.9 Persistence
 
@@ -382,21 +642,35 @@ This requires **stable numeric IDs**:
 - A connection is therefore `(JointID, PieceID, SocketID)` — one record per participating
   socket, so a joint of degree three saves as three records rather than needing a special case.
 
+Each connection also records its **adoption residual** (§2.5) and whether it was the anchor.
+Neither is needed to rebuild the assembly, since transforms are saved directly. Both are a few
+bytes and they make a drifting save diagnosable long after the build that produced it.
+
 Socket IDs must be stable across mesh re-exports, or existing saves break when art is updated.
-The grammar (§2.2) is built for this: `ID` is a field of its own, so re-cutting a panel changes
-its `Size` while leaving every socket's identity intact.
+That is cheap to guarantee because a piece's edge lengths never change (§2.2): a re-export may
+fix modelling errors, adjust thickness, or add a socket, but a panel of a different size is a
+different asset. Every socket name an existing save refers to is still there.
 
 ### 2.10 Replication-readiness
 
 Multiplayer is **not** being implemented now, but PolySnap should be shaped so co-op does not
 require a rewrite:
 
-- Snapping is expressed as a **validated operation on the graph** ("connect socket X to socket
-  Y"), not as a client directly writing a transform. Validation is a pure function of the two
-  sockets and the graph state, so a server can re-run it.
+- Snapping is expressed as a **validated operation on the graph**, not as a client directly
+  writing a transform. The payload is §2.5's placement inputs — anchor pair, polarity, and the
+  secondary pair that selected the dihedral — so the server re-derives the transform rather
+  than trusting one. An adopt-driven placement is therefore **integers only**; only the
+  player-driven free-hinge case has to send a quantised θ.
 - The numeric IDs from §2.9 double as network identity.
-- Physics-driven wobble is treated as cosmetic; the graph is the authority on what is
-  connected to what.
+- **The graph is the authority on topology, always.** Physics never creates or destroys a
+  connection, in either regime.
+- **Authority over geometry follows the regime** (§2.7). While loose, the solver owns it:
+  clients may visibly disagree by up to the constraint tolerance, and that divergence is
+  cosmetic precisely because it is transient and nothing durable reads it. Welding ends that.
+- **Welding is therefore server-authoritative.** It promotes solver state to permanent data, so
+  one authority snapshots the transforms and replicates them. Letting each client freeze its own
+  settled geometry would leave them disagreeing about where the panels are for good — the
+  solver is iterative and not bit-identical across machines or frame timings.
 
 ---
 
@@ -426,13 +700,25 @@ its own panels and gets the same snapping system.
    the socket math before anything is built on top of it.
 2. **A closed buckyball.** Hexes and pents assembling into a sealed truncated icosahedron,
    with the dihedral angles emerging from vertex closure rather than being authored (§2.4).
-   The real geometric test — **measure** the residual gap at closure rather than eyeballing it.
+   The real geometric test: log every connection's **adoption residual** (§2.5) and report the
+   worst case across the ninety edges. Float-noise residuals mean the snap math and the panel
+   outlines are both right. Residuals at a tenth of a millimetre or worse mean the panels are
+   cut wrong — which is a failure the `Size` token cannot see, being a rounded label (§2.2).
+
+   **Run it with the pieces kinematic and physics off.** A constraint solver is iterative and
+   leaves its bodies slightly off their ideal positions, so a residual measured against a
+   simulating assembly mixes panel-geometry error, which is what this test is for, with solver
+   strain, which is expected and unrelated. A flawless buckyball would report a nonzero number,
+   and a real 0.2 mm error could hide beneath the noise. Rigid pieces sit exactly where the snap
+   put them, so the residual measures only what it claims to. Whether the loose regime settles a
+   strained loop gracefully is a real question too, and a separate test.
 3. **Assembly graph and open-edge queries**, including a joint of degree three.
 4. **Welding** — merge to a single rigid body, identities preserved, reversible.
 5. **Save/load** of a complete assembly.
 6. **Enclosure detection** — identify airtight volumes.
 
-Attachment sockets, atmosphere simulation, and equipment come after the structural core works.
+Atmosphere simulation and equipment come after the structural core works, and neither is
+PolySnap's (§2.2, §2.8).
 
 ---
 
@@ -454,9 +740,9 @@ per feature, in conversation, not assumed.
 
 Marked explicitly so nobody builds on them as though they were settled.
 
-- **Attachment socket fields.** The grammar's head (§2.2) is settled for all socket types, but
-  what an `Attach` socket needs in its tail — mount class, load rating, orientation freedom —
-  is undesigned. Deferred until equipment is a real feature.
+- **Where equipment mounting lives.** Out of PolySnap (§2.2), but which plugin owns it, and
+  whether it reuses this naming grammar under its own tag or invents its own, is undecided. The
+  only thing settled is that the two coexist on a mesh without either knowing about the other.
 - **Curved edge subtypes.** Only `Straight` is in scope. Curves will need a multi-parameter
   tail (radius and arc length), which the grammar is shaped to accommodate but which nothing
   has been designed for.
@@ -467,21 +753,31 @@ Marked explicitly so nobody builds on them as though they were settled.
   requirement it likely adds a length field to the naming grammar.
 - **Joint capacity limits.** Whether a joint should ever refuse a participant, and on what
   grounds — physical interpenetration, or nothing at all.
+- **Coincident joints.** Joining two subassemblies normally creates fresh joints between free
+  sockets and needs no merging (§2.4). The exception is a joint on each side landing on the
+  same edge line — four panels arriving as two pre-formed pairs — which would need two existing
+  joints to become one, with an identity to pick between them and a save format that survives
+  it. Rare enough to defer, common enough that refusing it silently would be a bug.
 - **Magnets.** The idea of magnet sockets to assist alignment is open. Current recommendation:
   do *not* build a separate magnet plugin yet. Assisted alignment is better understood as an
   attraction behaviour of the existing socket search — pulling a held piece toward the best
   candidate socket pair — which needs no new concept. Revisit only if magnets turn out to need
   behaviour that socket attraction genuinely cannot express.
 - **Weld merge mechanics.** Which merge strategy preserves reversibility at acceptable cost.
-- **Enclosure algorithm.** How enclosure is actually determined — graph cycle analysis, or a
-  geometric test — and how it handles hatches, which are openable holes in an otherwise
-  sealed surface. Because pieces have no authored facing (§2.6), panel normals cannot be
-  assumed to agree on which side is "inside"; the algorithm must derive that from the enclosed
-  volume itself.
+- **Enclosure at T-junctions.** The algorithm is otherwise settled (§2.8): peel free edges,
+  propagate sides from tangent polarity. What is not is splitting a degree-3 joint into
+  separate compartments by angular order.
 - **Environment queries.** What exactly equipment asks for, and how cheaply. "Am I in an
   enclosed volume" is a graph query; "is that volume actually pressurised" belongs to a future
   atmosphere system (§2.8). The interface between them is undesigned.
 - **Tolerances.** Snap distance and angular thresholds; whether they are global, per socket
-  type, or scaled by piece size.
+  type, or scaled by piece size. The **adoption tolerance** for secondary connections (§2.5) is
+  a third and behaves differently from the other two: too tight and a correctly built vertex
+  refuses its second connection, too loose and visibly misaligned panels get welded into the
+  graph as though they had closed.
+- **Anchor selection.** The anchor is exact and every adopted connection carries the residual,
+  so which pair anchors decides where the error lands. Whether the player-driven pair is always
+  the right anchor — and whether it is worth re-anchoring a piece once the assembly has relaxed
+  — is unexplored.
 - **Framework choices.** Enhanced Input, GAS, StateTree, and similar are undecided and will be
   chosen per feature rather than adopted wholesale up front.
