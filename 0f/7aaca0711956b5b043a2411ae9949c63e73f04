@@ -1,0 +1,16 @@
+Config/DefaultGame.ini
+  h_72decab43bbb75 11-23
+Construction.uproject
+  h_72decab43bbb75 24-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0f7aaca0711956b5b043a2411ae9949c63e73f04",
+  "prompts": {},
+  "humans": {
+    "h_72decab43bbb75": {
+      "author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
