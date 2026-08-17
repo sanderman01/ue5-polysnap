@@ -1,0 +1,31 @@
+README.md
+  s_65ca2c766f4fe5::t_22ae901fdf9e1c 296-299
+  s_65ca2c766f4fe5::t_7298d66f15ef25 255-260
+CONVENTIONS.md
+  s_65ca2c766f4fe5::t_bf6251d8fddb6f 296-300,308-309,311-313,318-322
+  s_65ca2c766f4fe5::t_f0b413ff580610 73-75
+  s_65ca2c766f4fe5::t_f66516373a7c4e 30-33
+  s_65ca2c766f4fe5::t_9f731342bcd6db 336-338,343-344
+  s_65ca2c766f4fe5::t_4d9cb195f95d33 199-204,206-214
+  s_65ca2c766f4fe5::t_915eb789e433d8 45,47-53,55-61,66-67,70-72
+  s_65ca2c766f4fe5::t_f43cb797d5209b 197
+  s_65ca2c766f4fe5::t_82f6b8c4ef7e2f 133-134
+  s_65ca2c766f4fe5::t_bd561a11b41766 220-223,225-232,236-237
+  s_65ca2c766f4fe5::t_49e7ef3c067a71 88,91-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "74fc2b11891b00d1b29ac60c10cb446356c2fbfb",
+  "prompts": {},
+  "sessions": {
+    "s_65ca2c766f4fe5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef4d242e-719d-43d1-b9bb-d6ed168be169",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
