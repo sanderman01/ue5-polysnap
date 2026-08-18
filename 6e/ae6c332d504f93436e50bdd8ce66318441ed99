@@ -1,0 +1,19 @@
+Config/DefaultEngine.ini
+  s_e26cbda48913f8::t_c59257ffb590d6 111-115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "6eae6c332d504f93436e50bdd8ce66318441ed99",
+  "prompts": {},
+  "sessions": {
+    "s_e26cbda48913f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8013357f-aa91-44b9-b3c6-7a713194fabb",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
