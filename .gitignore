@@ -99,3 +99,8 @@ compile_commands.json
 .cache/
 # Unreal MCP client config, emitted by ModelContextProtocol.GenerateClientConfig
 .mcp.json
+
+# Working plans written at the repo root before a change is made. Scratch, not documentation
+# — the docs that are committed are the ones listed in CLAUDE.md. Root-anchored on purpose, so
+# a genuine planning doc filed somewhere like Docs/ can still be tracked.
+/*-plan.md
