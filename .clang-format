@@ -1,0 +1,136 @@
+# clang-format for Construction — Epic's coding standard.
+#
+# See CODE_STYLE.md. Derived from the .clang-format files Epic ships inside the engine
+# (Engine/Source/Runtime/AutoRTFM, .../CorePreciseFP), adjusted to the engine-wide style
+# rather than those modules' local variants.
+#
+# Requires clang-format 21 or newer (ReflowComments became an enum in 21).
+# Never run this over Engine/ or Intermediate/ — see Tools/format.sh.
+
+---
+Language: Cpp
+BasedOnStyle: LLVM
+Standard: c++20
+
+# --- Indentation: tabs, 4 wide, Allman braces -------------------------------
+UseTab: ForContinuationAndIndentation
+TabWidth: 4
+IndentWidth: 4
+ContinuationIndentWidth: 4
+AccessModifierOffset: -4
+BreakBeforeBraces: Allman
+NamespaceIndentation: None
+IndentPPDirectives: None
+IndentCaseLabels: true
+IndentCaseBlocks: false
+IndentExternBlock: NoIndent
+LambdaBodyIndentation: Signature
+
+# --- Line breaking ----------------------------------------------------------
+# Epic sets no hard limit; 120 is the practical width the engine's own code sits at.
+# Set to 0 to disable reflowing entirely.
+ColumnLimit: 120
+AlignAfterOpenBracket: DontAlign
+AlignOperands: AlignAfterOperator
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: BeforeComma
+PackConstructorInitializers: CurrentLine
+BreakTemplateDeclarations: Yes
+BreakStringLiterals: true
+AlwaysBreakBeforeMultilineStrings: false
+
+# --- What may collapse onto one line ----------------------------------------
+# Inline accessors (`FORCEINLINE bool IsFoo() const { return bFoo; }`) are idiomatic UE.
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortBlocksOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: Inline
+AllowShortEnumsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+
+# --- Spacing ----------------------------------------------------------------
+PointerAlignment: Left
+ReferenceAlignment: Left
+DerivePointerAlignment: false
+Cpp11BracedListStyle: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeCaseColon: false
+SpacesBeforeTrailingComments: 1
+SpaceAfterTemplateKeyword: false
+BitFieldColonSpacing: Both
+
+# --- Alignment / blank lines ------------------------------------------------
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignConsecutiveBitFields: None
+AlignTrailingComments: true
+AlignEscapedNewlines: Left
+AlignArrayOfStructures: Right
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+EmptyLineBeforeAccessModifier: LogicalBlock
+FixNamespaceComments: true
+ShortNamespaceLines: 30
+InsertNewlineAtEOF: true
+
+# Doc comments and the ASCII diagrams in them are hand-formatted; leave them alone.
+ReflowComments: Never
+
+# --- Includes ---------------------------------------------------------------
+# CODE_STYLE.md: IWYU includes, `.generated.h` always last.
+# IncludeBlocks: Preserve means sorting happens *within* a block only, never across a
+# blank line, so deliberate grouping survives. The module's own header keeps priority 0
+# via IncludeIsMainRegex; `.generated.h` is pinned to the end by its own category.
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+IncludeIsMainRegex: '(Test)?$'
+IncludeCategories:
+  - Regex: '^"CoreMinimal\.h"$'
+    Priority: 1
+  - Regex: '\.generated\.h"$'
+    Priority: 1000
+  - Regex: '^<'
+    Priority: 900
+  - Regex: '.*'
+    Priority: 10
+
+# --- Unreal macros ----------------------------------------------------------
+# Without these, clang-format glues `UPROPERTY()` onto the declaration below it and
+# indents GENERATED_BODY() as if it were an expression.
+StatementMacros:
+  - UPROPERTY
+  - UFUNCTION
+  - UCLASS
+  - USTRUCT
+  - UENUM
+  - UINTERFACE
+  - UDELEGATE
+  - UPARAM
+  - GENERATED_BODY
+  - GENERATED_UCLASS_BODY
+  - GENERATED_USTRUCT_BODY
+  - GENERATED_UINTERFACE_BODY
+  - GENERATED_IINTERFACE_BODY
+  - RIGVM_METHOD
+AttributeMacros:
+  - UE_NODISCARD
+  - UE_NORETURN
+  - UE_DEPRECATED
+  - FORCEINLINE
+  - FORCENOINLINE
+NamespaceMacros:
+  - UE_DECLARE_INTERNAL_LINK_BASE
+TypenameMacros:
+  - UE_STATIC_ONLY
+WhitespaceSensitiveMacros:
+  - TEXT
+  - TEXTVIEW
+  - UE_LOG_EXPAND_IS_FATAL
+  - STRINGIZE
+  - LOCTEXT
+  - NSLOCTEXT

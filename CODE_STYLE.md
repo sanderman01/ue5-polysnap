@@ -8,6 +8,19 @@ Applies to every module in the project — plugins and the `Construction` game m
 
 ---
 
+## Enforced by tooling, not by memory
+
+`.clang-format` and `.clang-tidy` at the project root encode as much of this document as a
+machine can check: indentation, brace placement, include order (`.generated.h` last), const
+correctness on parameters, `override`, and the `check()`-with-side-effects trap. Run them with
+the `clang-tools` skill — `Tools/format.sh` and `Tools/tidy.sh`.
+
+The rest of this file is the part tooling cannot check. Identifier prefixes in particular are
+review's job: whether a type is `F`, `U`, `A`, or `I` depends on its base class, which no regex
+can see.
+
+---
+
 ## Epic's coding standard, strictly
 
 This is non-negotiable and outranks personal taste:

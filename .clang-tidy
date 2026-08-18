@@ -1,0 +1,123 @@
+# clang-tidy for Construction — see CODE_STYLE.md and the `clang-tools` skill.
+#
+# Requires clang-tidy 19+ (ExcludeHeaderFilterRegex). Run it through Tools/tidy.sh, which
+# builds the PCH-free compile database clang-tidy needs; a bare `clang-tidy` invocation
+# against the clangd database fails on the engine's precompiled header.
+#
+# Rules of thumb for editing this list:
+#   * a check that fights Epic's coding standard is wrong, not the standard;
+#   * a check that fires on idiomatic engine code is noise and buys nothing;
+#   * everything left should either catch a bug or enforce something CODE_STYLE.md states.
+
+---
+# Whole families are enabled and then trimmed; families that mostly push STL idioms
+# (modernize, readability, misc) are opt-in per check instead.
+Checks: >
+  -*,
+
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-forward-declaration-namespace,
+  -bugprone-throwing-static-initialization,
+
+  concurrency-*,
+
+  performance-*,
+  -performance-enum-size,
+
+  modernize-concat-nested-namespaces,
+  modernize-loop-convert,
+  modernize-redundant-void-arg,
+  modernize-use-bool-literals,
+  modernize-use-default-member-init,
+  modernize-use-equals-default,
+  modernize-use-equals-delete,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-using,
+
+  readability-avoid-const-params-in-decls,
+  readability-braces-around-statements,
+  readability-const-return-type,
+  readability-delete-null-pointer,
+  readability-duplicate-include,
+  readability-inconsistent-declaration-parameter-name,
+  readability-make-member-function-const,
+  readability-misleading-indentation,
+  readability-non-const-parameter,
+  readability-qualified-auto,
+  readability-redundant-control-flow,
+  readability-redundant-member-init,
+  readability-redundant-smartptr-get,
+  readability-redundant-string-cstr,
+  readability-simplify-boolean-expr,
+  readability-static-definition-in-anonymous-namespace,
+  readability-string-compare,
+
+  misc-definitions-in-headers,
+  misc-header-include-cycle,
+  misc-misleading-bidirectional,
+  misc-misleading-identifier,
+  misc-misplaced-const,
+  misc-redundant-expression,
+  misc-static-assert,
+  misc-unconventional-assign-operator,
+  misc-uniqueptr-reset-release,
+  misc-unused-alias-decls,
+  misc-unused-using-decls
+
+# bugprone-throwing-static-initialization is off because IMPLEMENT_PRIMARY_GAME_MODULE and
+# friends expand to exactly the pattern it flags: the diagnostic points at our .cpp but the
+# construct is entirely the engine's.
+#
+# Deliberately absent, so nobody re-adds them by accident:
+#   clang-analyzer-*      the path-sensitive analyzer costs minutes per UE translation unit.
+#                         Tools/tidy.sh --analyze turns it on for a targeted run.
+#   misc-include-cleaner  wants Containers/Array.h instead of CoreMinimal.h and does not
+#                         understand .generated.h. Fights the engine's include model.
+#   misc-const-correctness, readability-identifier-length, readability-magic-numbers,
+#   readability-function-cognitive-complexity, misc-no-recursion  — pure noise on gameplay code.
+#   readability-identifier-naming  cannot express Epic's prefixes (F/U/A/E/T/I/S depend on the
+#                         base class, not the token). Enforced by review, not by tooling.
+#   modernize-use-trailing-return-type, modernize-avoid-c-arrays, modernize-pass-by-value,
+#   modernize-use-nodiscard, modernize-return-braced-init-list  — conflict with Epic's style.
+#   cppcoreguidelines-*, google-*, llvm-*  — assume the STL and LLVM's own conventions.
+
+# Left empty on purpose: a bare run then reports only the .cpp itself. Tools/tidy.sh passes
+# --header-filter with the absolute project path, which is the only machine-independent way
+# to say "our headers but not the engine's" (llvm::Regex has no negative lookahead).
+HeaderFilterRegex: ''
+ExcludeHeaderFilterRegex: '.*/(Intermediate|Binaries|DerivedDataCache|Saved)/.*'
+SystemHeaders: false
+
+# --fix reformats what it rewrites using our .clang-format.
+FormatStyle: file
+
+# Promoted to errors by Tools/tidy.sh --strict rather than here, so an editor showing
+# live diagnostics stays advisory.
+WarningsAsErrors: ''
+
+CheckOptions:
+  # Epic requires braces on every control statement, however short.
+  readability-braces-around-statements.ShortStatementLines: '0'
+
+  # UE style is `bool bFoo = false;`, not `bool bFoo{false};`.
+  modernize-use-default-member-init.UseAssignment: 'true'
+
+  # check()/checkSlow() compile down to __builtin_assume in Shipping, which does *not*
+  # evaluate its argument — so side effects inside them silently vanish from a shipped
+  # build. This is the classic UE assertion bug. verify()/verifyf() are excluded because
+  # they exist precisely to keep evaluating in Shipping; ensure() keeps evaluating too.
+  bugprone-assert-side-effect.AssertMacros: 'check,checkf,checkSlow,checkfSlow,checkCode'
+  bugprone-assert-side-effect.CheckFunctionCalls: 'true'
+
+  # UE passes its small value types by value on purpose; the check's size heuristic would
+  # flag every FVector parameter in the codebase.
+  performance-unnecessary-value-param.AllowedTypes: 'FName;FGuid;FColor;FLinearColor;FIntPoint;FIntVector;FIntRect;FVector2D;FVector;FVector3f;FVector4;FRotator;FQuat;FMatrix;FBox;FBox2D;FSphere;FPlane;FDateTime;FTimespan;FFrameNumber;FFrameTime;FGameplayTag;TObjectPtr<.*>;TWeakObjectPtr<.*>;TSoftObjectPtr<.*>;TSubclassOf<.*>;TFunctionRef<.*>;TArrayView<.*>;TStringView<.*>'
+  performance-for-range-copy.AllowedTypes: 'FName;TObjectPtr<.*>;TWeakObjectPtr<.*>'
+
+  readability-inconsistent-declaration-parameter-name.Strict: 'false'
+  modernize-loop-convert.MinConfidence: 'reasonable'
+  misc-definitions-in-headers.UseHeaderFileExtension: 'true'

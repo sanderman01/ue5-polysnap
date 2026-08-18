@@ -25,6 +25,16 @@ Takes a few seconds and ends with `ClangDatabase written to <project>/compile_co
 - Use `ConstructionEditor` — it is a superset of `Construction`. For the runtime target,
   add `-OutputFilename=` so it does not clobber the editor database.
 
+## clang-tidy needs a different database
+
+Do not point clang-tidy at this file. It is built against the engine's shared PCH, which only
+the engine's own clang can read, and it carries that clang's builtin-header path. Both break a
+system clang-tidy; clangd survives because it injects its own `-resource-dir`. `Tools/tidy.sh`
+builds its own `-NoPCH` copy under `Intermediate/ClangTidy/` — see the `clang-tools` skill.
+
+Both databases point at the same `.rsp` files under `Intermediate/Build`, so regenerating
+either one rewrites the other's flags. Neither tool caches across that, so it self-heals.
+
 ## Sanity checks
 
 Compare the entry count against `find Source Plugins -name '*.cpp' | wc -l`, not against a

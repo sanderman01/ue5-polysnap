@@ -12,6 +12,7 @@ Where the two overlap, this file wins.
 | [CODE_STYLE.md](CODE_STYLE.md) | How the C++ is written: Epic's standard, modern C++, lifetime rules, Blueprint API hygiene. Read it before writing code. |
 | `unreal-build` skill | Building a target, the editor guard, regenerating project files. |
 | `automation-tests` skill | What gets a test, where it lives, how to run it. |
+| `clang-tools` skill | Running clang-format and clang-tidy, and why clang-tidy needs its own compile database. |
 
 ## What this project is
 
@@ -66,6 +67,10 @@ skill before writing a test. Two rules that must hold even if you never open the
 See [CODE_STYLE.md](CODE_STYLE.md) — read it before writing C++. Epic's coding standard is
 non-negotiable and outranks personal taste; modern C++ is welcome where it does not conflict
 with it, and never via STL containers in place of UE ones.
+
+`.clang-format` and `.clang-tidy` at the project root are the machine-readable half of that
+document. Run them with the **`clang-tools`** skill; `Tools/format.sh --check` is the quickest
+way to confirm a change is committable.
 
 ## Assets and config
 
