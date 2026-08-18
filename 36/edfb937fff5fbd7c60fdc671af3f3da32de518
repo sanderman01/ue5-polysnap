@@ -1,0 +1,19 @@
+Config/DefaultEditor.ini
+  s_9a86bc067bb35e::t_859f8d4b1dac2d 11-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "36edfb937fff5fbd7c60fdc671af3f3da32de518",
+  "prompts": {},
+  "sessions": {
+    "s_9a86bc067bb35e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "752e468c-480f-4c72-a782-b4745f12e097",
+        "model": "unknown"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
