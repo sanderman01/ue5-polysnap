@@ -1,0 +1,30 @@
+Source/Construction/Construction.h
+  s_e26cbda48913f8::t_ee8caadee09bc3 6-9
+Source/Construction/Construction.Build.cs
+  s_e26cbda48913f8::t_ee8caadee09bc3 11
+Source/Construction/ConstructionCharacter.h
+  s_e26cbda48913f8::t_233bb96fedaa9e 1-100
+Source/Construction/Construction.cpp
+  s_e26cbda48913f8::t_ee8caadee09bc3 4,7
+  s_e26cbda48913f8::t_a19644d495ba82 8
+Source/Construction/ConstructionCharacter.cpp
+  s_e26cbda48913f8::t_d01decc090f4c8 6,38-39,61-62
+  s_e26cbda48913f8::t_5658bbe7b42b86 1-5,8-12,15-37,40-60,63-150
+  s_e26cbda48913f8::t_8cfb8b0c6a4162 7,13-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "b858917f9363d1f3d4ad11bdc1851c8b8407d694",
+  "prompts": {},
+  "sessions": {
+    "s_e26cbda48913f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8013357f-aa91-44b9-b3c6-7a713194fabb",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
