@@ -1,0 +1,22 @@
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapSettings.h
+  s_c6c7e65e9b3624::t_14ae87ee1a6aa5 82-87,89
+  s_c6c7e65e9b3624::t_05e21de7339381 88
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapBuilderComponent.cpp
+  s_c6c7e65e9b3624::t_14ae87ee1a6aa5 227-232
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "88ed647c8562662874d91bcb0020b44732e356d3",
+  "prompts": {},
+  "sessions": {
+    "s_c6c7e65e9b3624": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1fb15820-323f-40f8-a6fe-93e8b040fe0b",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
