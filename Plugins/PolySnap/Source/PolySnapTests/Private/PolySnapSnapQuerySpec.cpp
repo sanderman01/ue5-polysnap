@@ -1,0 +1,212 @@
+// Copyright (c) 2026, Alexander Verbeek. All rights reserved.
+
+#include "Misc/AutomationTest.h"
+#include "PolySnapGeometry.h"
+#include "PolySnapSnapQuery.h"
+#include "PolySnapTypes.h"
+
+#if WITH_DEV_AUTOMATION_TESTS
+
+BEGIN_DEFINE_SPEC(FPolySnapSnapQuerySpec, "PolySnap.SnapQuery",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+/** Half of the calibration panel's 2000 mm edge, in Unreal units. */
+static constexpr double HalfPanelUu = 100.0;
+
+/** A world socket with no piece behind it, which is all the pure query needs. */
+static FPolySnapWorldSocket MakeSocket(int32 Id, int32 SizeMillimetres, const FTransform& WorldTransform)
+{
+	FPolySnapWorldSocket Socket;
+	Socket.Descriptor.SocketName = FName(*FString::Printf(TEXT("Edge_%03d_Straight_%d"), Id, SizeMillimetres));
+	Socket.Descriptor.Id = Id;
+	Socket.Descriptor.SubType = EPolySnapEdgeSubType::Straight;
+	Socket.Descriptor.SizeMillimetres = SizeMillimetres;
+	Socket.WorldTransform = WorldTransform;
+
+	return Socket;
+}
+
+/** The socket on the +X edge of a panel at the given transform. */
+static FTransform PrimarySocketAt(const FTransform& PieceTransform)
+{
+	return FTransform(FRotator::ZeroRotator, FVector(HalfPanelUu, 0.0, 0.0)) * PieceTransform;
+}
+
+static FString RejectionName(EPolySnapRejection Rejection)
+{
+	return FPolySnapSnapQuery::RejectionToString(Rejection);
+}
+
+END_DEFINE_SPEC(FPolySnapSnapQuerySpec)
+
+void FPolySnapSnapQuerySpec::Define()
+{
+	const FPolySnapQueryTolerances Tolerances;
+
+	Describe("testing one socket pair",
+		[this, Tolerances]()
+		{
+			It("rejects an incompatible size before anything geometric runs",
+				[this, Tolerances]()
+				{
+					// Cheap integer comparison, so it goes first. Two sockets in exactly the same place
+					// still do not mate if their sizes differ.
+					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity);
+					const FPolySnapWorldSocket Target = MakeSocket(1, 3464, FTransform::Identity);
+
+					FPolySnapCandidate Candidate;
+					TestEqual("reason",
+						RejectionName(FPolySnapSnapQuery::TestPair(Held, Target, Tolerances, Candidate)),
+						RejectionName(EPolySnapRejection::Incompatible));
+				});
+
+			It("rejects a pair further apart than the snap distance",
+				[this, Tolerances]()
+				{
+					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity);
+					const FPolySnapWorldSocket Target =
+						MakeSocket(1, 2000, FTransform(FRotator(0.0, 180.0, 0.0), FVector(500.0, 0.0, 0.0)));
+
+					FPolySnapCandidate Candidate;
+					TestEqual("reason",
+						RejectionName(FPolySnapSnapQuery::TestPair(Held, Target, Tolerances, Candidate)),
+						RejectionName(EPolySnapRejection::TooFar));
+				});
+
+			It("rejects a pair whose edges are not collinear",
+				[this, Tolerances]()
+				{
+					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity);
+					const FPolySnapWorldSocket Target = MakeSocket(1, 2000, FTransform(FRotator(0.0, 90.0, 0.0)));
+
+					FPolySnapCandidate Candidate;
+					TestEqual("reason",
+						RejectionName(FPolySnapSnapQuery::TestPair(Held, Target, Tolerances, Candidate)),
+						RejectionName(EPolySnapRejection::TangentNotCollinear));
+					TestEqual("angle", Candidate.TangentAngleDegrees, 90.0, 1.0e-3);
+				});
+
+			It("accepts either tangent polarity, because both are admissible",
+				[this, Tolerances]()
+				{
+					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity);
+
+					// Opposed tangents.
+					const FPolySnapWorldSocket Aligned = MakeSocket(1, 2000, FTransform(FRotator(0.0, 180.0, 0.0)));
+					FPolySnapCandidate AlignedCandidate;
+					TestEqual("aligned",
+						RejectionName(FPolySnapSnapQuery::TestPair(Held, Aligned, Tolerances, AlignedCandidate)),
+						RejectionName(EPolySnapRejection::None));
+
+					// Same tangent: the piece is turned over, which is a motion the player can perform.
+					const FPolySnapWorldSocket Flipped = MakeSocket(1, 2000, FTransform(FRotator(0.0, 0.0, 180.0)));
+					FPolySnapCandidate FlippedCandidate;
+					TestEqual("flipped",
+						RejectionName(FPolySnapSnapQuery::TestPair(Held, Flipped, Tolerances, FlippedCandidate)),
+						RejectionName(EPolySnapRejection::None));
+				});
+
+			It("reports the gap and the edge angle even for a pair it rejects",
+				[this, Tolerances]()
+				{
+					// The measurements are what the debug readout shows while the player closes in, so
+					// they have to be filled in on the way to a rejection, not only on success.
+					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity);
+					const FPolySnapWorldSocket Target =
+						MakeSocket(1, 2000, FTransform(FRotator(0.0, 180.0, 0.0), FVector(60.0, 0.0, 0.0)));
+
+					FPolySnapCandidate Candidate;
+					TestEqual("reason",
+						RejectionName(FPolySnapSnapQuery::TestPair(Held, Target, Tolerances, Candidate)),
+						RejectionName(EPolySnapRejection::TooFar));
+
+					TestEqual("gap", Candidate.GapUu, 60.0, 1.0e-6);
+					TestEqual("angle", Candidate.TangentAngleDegrees, 0.0, 1.0e-3);
+				});
+		});
+
+	Describe("finding the anchor",
+		[this, Tolerances]()
+		{
+			It("returns nothing when no pair is in tolerance",
+				[this, Tolerances]()
+				{
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, 2000, FTransform::Identity)};
+					const TArray<FPolySnapWorldSocket> Targets = {
+						MakeSocket(1, 2000, FTransform(FRotator::ZeroRotator, FVector(900.0, 0.0, 0.0)))};
+
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, FTransform::Identity, Tolerances);
+
+					TestFalse("unset", Candidate.IsSet());
+				});
+
+			It("solves a transform that places the held socket exactly on the target",
+				[this, Tolerances]()
+				{
+					// Panel B sits a few units off a flush coplanar seam with panel A, the way a player
+					// would hold it. The solve has to close that gap exactly.
+					const FTransform PanelA = FTransform::Identity;
+					const FTransform PanelB(FRotator(0.0, 178.0, 0.0), FVector(2.0 * HalfPanelUu + 4.0, 2.0, 0.0));
+
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, 2000, PrimarySocketAt(PanelB))};
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, 2000, PrimarySocketAt(PanelA))};
+
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
+
+					TestTrue("found a candidate", Candidate.IsSet());
+
+					const FTransform HeldSocketLocal = Candidate.HeldSocket.WorldTransform.GetRelativeTransform(PanelB);
+					const FPolySnapSocketBasis Placed =
+						FPolySnapGeometry::BasisFromTransform(HeldSocketLocal * Candidate.SolvedPieceTransform);
+					const FPolySnapSocketBasis Anchor =
+						FPolySnapGeometry::BasisFromTransform(Candidate.TargetSocket.WorldTransform);
+
+					TestEqual("sockets coincide", Placed.Location, Anchor.Location, 1.0e-3f);
+					TestEqual("tangents collinear", FMath::Abs(Placed.Tangent | Anchor.Tangent), 1.0, 1.0e-4);
+				});
+
+			It("prefers the nearer of two passing pairs",
+				[this, Tolerances]()
+				{
+					const FTransform PanelB(FRotator(0.0, 180.0, 0.0), FVector(2.0 * HalfPanelUu + 2.0, 0.0, 0.0));
+
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, 2000, PrimarySocketAt(PanelB))};
+
+					// Two targets on the same edge line, one 2 uu away and one 12 uu away.
+					const TArray<FPolySnapWorldSocket> Targets = {
+						MakeSocket(7, 2000,
+							PrimarySocketAt(FTransform(FRotator::ZeroRotator, FVector(10.0, 0.0, 0.0)))),
+						MakeSocket(4, 2000, PrimarySocketAt(FTransform::Identity))};
+
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
+
+					TestTrue("found a candidate", Candidate.IsSet());
+					TestEqual("anchored on the nearer socket", Candidate.TargetSocket.Descriptor.Id, 4);
+				});
+
+			It("records why the pairs that failed did",
+				[this, Tolerances]()
+				{
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, 2000, FTransform::Identity)};
+					const TArray<FPolySnapWorldSocket> Targets = {
+						MakeSocket(1, 2000, FTransform(FRotator::ZeroRotator, FVector(900.0, 0.0, 0.0)))};
+
+					TArray<FPolySnapRejectedPair> Rejections;
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, FTransform::Identity, Tolerances, &Rejections);
+
+					TestFalse("nothing was accepted", Candidate.IsSet());
+					TestEqual("one rejection", Rejections.Num(), 1);
+					if (Rejections.Num() == 1)
+					{
+						TestEqual("reason", RejectionName(Rejections[0].Reason),
+							RejectionName(EPolySnapRejection::TooFar));
+					}
+				});
+		});
+}
+
+#endif // WITH_DEV_AUTOMATION_TESTS

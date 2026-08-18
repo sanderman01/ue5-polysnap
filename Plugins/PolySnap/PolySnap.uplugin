@@ -1,0 +1,34 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "PolySnap",
+	"Description": "Node-based edge snapping: pieces connect to each other through authored edge sockets rather than to a global grid.",
+	"Category": "Building",
+	"CreatedBy": "Alexander Verbeek",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "PolySnap",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault"
+		},
+		{
+			"Name": "PolySnapEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "PolySnapTests",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		}
+	]
+}

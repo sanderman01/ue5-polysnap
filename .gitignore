@@ -104,3 +104,6 @@ compile_commands.json
 # — the docs that are committed are the ones listed in CLAUDE.md. Root-anchored on purpose, so
 # a genuine planning doc filed somewhere like Docs/ can still be tracked.
 /*-plan.md
+
+# Working task trackers written beside a plan. Same class of document, same rule.
+/*-todo.md

@@ -12,6 +12,10 @@
 	],
 	"Plugins": [
 		{
+			"Name": "PolySnap",
+			"Enabled": true
+		},
+		{
 			"Name": "ModelingToolsEditorMode",
 			"Enabled": true,
 			"TargetAllowList": [
