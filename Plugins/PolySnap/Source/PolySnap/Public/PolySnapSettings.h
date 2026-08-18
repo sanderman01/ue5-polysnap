@@ -79,9 +79,14 @@ public:
 	UPROPERTY(config, EditAnywhere, Category = "Building", meta = (ClampMin = "1.0", ForceUnits = "cm"))
 	float HoldDistanceStepUu = 25.0f;
 
-	/** How far one roll input step turns the held piece about the view axis. */
-	UPROPERTY(config, EditAnywhere, Category = "Building", meta = (ClampMin = "1.0", ForceUnits = "deg"))
-	float RollStepDegrees = 15.0f;
+	/**
+	 * How fast holding a roll key turns the held piece about the view axis.
+	 *
+	 * A rate rather than a per-press step: the roll keys are held down, so the input fires every
+	 * frame and only a rate multiplied by delta time is both smooth and framerate independent.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Building", meta = (ClampMin = "1.0", ForceUnits = "deg/s"))
+	float RollRateDegreesPerSecond = 90.0f;
 
 	// -- Physics ----------------------------------------------------------------------------
 

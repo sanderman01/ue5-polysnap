@@ -224,7 +224,12 @@ void UPolySnapBuilderComponent::HandleDrop()
 
 void UPolySnapBuilderComponent::HandleRoll(const FInputActionValue& Value)
 {
-	HeldRollDegrees += Value.Get<float>() * UPolySnapSettings::Get().RollStepDegrees;
+	// Triggered fires once per frame for as long as the key is held, so this is a rate and has to
+	// be scaled by the frame's delta -- otherwise the roll speed follows the framerate.
+	const UWorld* World = GetWorld();
+	const double DeltaSeconds = World != nullptr ? World->GetDeltaSeconds() : 0.0;
+
+	HeldRollDegrees -= Value.Get<float>() * UPolySnapSettings::Get().RollRateDegreesPerSecond * DeltaSeconds;
 }
 
 void UPolySnapBuilderComponent::HandleHoldDistance(const FInputActionValue& Value)
