@@ -1,0 +1,120 @@
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapSnapQuery.h
+  s_96e991bbdf10a5::t_018ad8c2dfc4c9 1-85,88
+  s_96e991bbdf10a5::t_af9e011b0c11e4 86-87
+Plugins/PolySnap/Source/PolySnapEditor/Private/PolySnapMeshValidation.cpp
+  s_96e991bbdf10a5::t_e3b340a1bb6923 5
+  s_96e991bbdf10a5::t_70cfbecc28a10b 1-4,6-17,20,23,28,30-33,37,41,43,47,51,54,59,62,71,73,76-77,81,83-94,97-179,181-220,222-235,237-279,281-345,349-352
+  s_96e991bbdf10a5::t_af9e011b0c11e4 18-19,21-22,24-27,29,34-36,38-40,42,44-46,48-50,52-53,55-58,60-61,63-70,72,74-75,78-80,82,95-96,180,221,236,280,346-348
+Plugins/PolySnap/Source/PolySnap/Private/PolySnap.cpp
+  s_96e991bbdf10a5::t_84cc20f6b55d5c 1-9
+Plugins/PolySnap/Source/PolySnapEditor/PolySnapEditor.Build.cs
+  s_96e991bbdf10a5::t_bb020575541bf4 1-26
+Plugins/PolySnap/Source/PolySnap/PolySnap.Build.cs
+  s_96e991bbdf10a5::t_bb020575541bf4 1-26
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapDebug.h
+  s_96e991bbdf10a5::t_ee59cac15c36e8 1-57,60-61,64
+  s_96e991bbdf10a5::t_af9e011b0c11e4 58-59,62-63
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapGeometry.h
+  s_96e991bbdf10a5::t_af9e011b0c11e4 46,53-54,86-87,94-96
+  s_96e991bbdf10a5::t_11cd584613f3d0 1-45,47-52,55-85,88-93,97-109
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapPiece.h
+  s_96e991bbdf10a5::t_984ea25399f8c7 1-38,40,43-57,59-60,62-63
+  s_96e991bbdf10a5::t_af9e011b0c11e4 39,41-42,58,61
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapSnapQuerySpec.cpp
+  s_96e991bbdf10a5::t_af9e011b0c11e4 20,46-47,49-125,128-129,131-208,212
+  s_96e991bbdf10a5::t_f693d65d66ab04 1-19,21-45,48,126-127,130,209-211
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapSubsystem.cpp
+  s_96e991bbdf10a5::t_af9e011b0c11e4 14-16
+  s_96e991bbdf10a5::t_f83c65f0349ec5 1-13,17-107
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapBuilderComponent.h
+  s_96e991bbdf10a5::t_af9e011b0c11e4 6,41-42,47
+  s_96e991bbdf10a5::t_89ab2caa573531 40
+  s_96e991bbdf10a5::t_c2eff13c4f5ba4 1-5,7-39,43-46,48-128
+Plugins/PolySnap/PolySnap.uplugin
+  s_96e991bbdf10a5::t_77bd1110b547d5 1-34
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapPieceComponent.h
+  s_96e991bbdf10a5::t_3bd70d92eabb6a 1-5,7-29,31-38,40-41,43-56,59-65,67-81
+  s_96e991bbdf10a5::t_af9e011b0c11e4 6,39,42,57-58,66
+  s_96e991bbdf10a5::t_89ab2caa573531 30
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapTests.cpp
+  s_96e991bbdf10a5::t_84cc20f6b55d5c 1-5
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapBuilderComponent.cpp
+  s_96e991bbdf10a5::t_34cebf423bcc1f 1-5,7-31,34,36-38,40,45,49,52,59,64,66-124,126-137,139-157,159-275,278-344,347-395,400-438,443-447,450-466,469-484,486-488,491-535,539-548,552-554,557-560
+  s_96e991bbdf10a5::t_af9e011b0c11e4 32-33,35,39,41-44,46-48,50-51,53-58,62,65,125,138,158,276-277,345-346,396-399,439-442,467-468,485,489-490,536-538,549-551,555-556
+  s_96e991bbdf10a5::t_89ab2caa573531 6,448-449
+  s_96e991bbdf10a5::t_545303f6a63a18 60-61,63
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapPieceComponent.cpp
+  s_96e991bbdf10a5::t_d79052ab279333 1-32,34-66,69-98,100-109,112-143,146-181
+  s_96e991bbdf10a5::t_af9e011b0c11e4 33,67-68,99,110-111,144-145
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapSocketNameSpec.cpp
+  s_96e991bbdf10a5::t_332f84cf136d9f 15-21,26-36
+  s_96e991bbdf10a5::t_f7443674a1903e 1-14,22-25,37-42,199-201
+  s_96e991bbdf10a5::t_af9e011b0c11e4 43-198,202
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapGeometry.cpp
+  s_96e991bbdf10a5::t_3e99a8942350c6 1-6,8-11,13-55,58-72,75-114,116-121,124-125,128-129,132-148
+  s_96e991bbdf10a5::t_af9e011b0c11e4 7,12,56-57,73-74,115,122-123,126-127,130-131
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapSettings.cpp
+  s_96e991bbdf10a5::t_666814948fb9e6 1-22
+Plugins/PolySnap/Source/PolySnapEditor/Public/PolySnapEditor.h
+  s_96e991bbdf10a5::t_84cc20f6b55d5c 1-23
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapSnapQuery.cpp
+  s_96e991bbdf10a5::t_af9e011b0c11e4 32,57-58,65,90,100,106,111-112,115
+  s_96e991bbdf10a5::t_899ececc41c76b 1-31,33-56,59-64,66-89,91-99,101-105,107-110,113-114,116-147
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapSubsystem.h
+  s_96e991bbdf10a5::t_f83c65f0349ec5 1-41,43-50,53-62,64-71
+  s_96e991bbdf10a5::t_af9e011b0c11e4 42,51-52,63
+Plugins/PolySnap/Source/PolySnapEditor/Public/PolySnapMeshValidation.h
+  s_96e991bbdf10a5::t_f79ea69d5a1816 1-35,37-68,71
+  s_96e991bbdf10a5::t_af9e011b0c11e4 36,69-70
+Plugins/PolySnap/Source/PolySnap/Public/PolySnap.h
+  s_96e991bbdf10a5::t_84cc20f6b55d5c 1-9
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapGeometrySpec.cpp
+  s_96e991bbdf10a5::t_6c7f248560442b 1-24,277-279
+  s_96e991bbdf10a5::t_af9e011b0c11e4 25-276,280
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapDebug.cpp
+  s_96e991bbdf10a5::t_af9e011b0c11e4 17-41,43-46,48-56,58-60,86,106-111,161-162,167-168,186-187,205-206
+  s_96e991bbdf10a5::t_c86809105bbd62 1-16,42,47,57,61-85,87-105,112-160,163-166,169-185,188-204,207-209
+Plugins/PolySnap/Source/PolySnapEditor/Private/PolySnapEditor.cpp
+  s_96e991bbdf10a5::t_af9e011b0c11e4 18-20,22,24,26,33-36,38-41,43-45,47-48,58-59
+  s_96e991bbdf10a5::t_e3b340a1bb6923 1-17,21,23,25,27-32,37,42,46,49-57,60-79
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapSocketName.h
+  s_96e991bbdf10a5::t_af9e011b0c11e4 72-73,76-77
+  s_96e991bbdf10a5::t_a993161358425d 1-71,74,79-90
+  s_96e991bbdf10a5::t_f81d6f83075566 75,78
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapSocketName.cpp
+  s_96e991bbdf10a5::t_eaa28a50dadff2 1-6,21,23,25-29,34-36,41,43-44,51,53-54,56-80,83-86,88-111,114-158,161-174,177-184,187-210,226
+  s_96e991bbdf10a5::t_f81d6f83075566 81-82,87,211-212,215-225
+  s_96e991bbdf10a5::t_af9e011b0c11e4 7-20,22,24,30-33,37-40,42,45-50,52,55,112-113,159-160,175-176,185-186,213-214
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapPiece.cpp
+  s_96e991bbdf10a5::t_984ea25399f8c7 1-59
+Construction.uproject
+  s_96e991bbdf10a5::t_66a9afeee63063 15-17,38
+  s_96e991bbdf10a5::t_996342ac944538 14
+Plugins/PolySnap/Source/PolySnapTests/PolySnapTests.Build.cs
+  s_96e991bbdf10a5::t_bb020575541bf4 1-19
+.gitignore
+  s_96e991bbdf10a5::t_9868ff9514b416 107-109
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapTypes.h
+  s_96e991bbdf10a5::t_a993161358425d 134
+  s_96e991bbdf10a5::t_81aa04e9fa0334 1-58,60-66,68-133,135-174,176-213
+  s_96e991bbdf10a5::t_af9e011b0c11e4 59,67,175
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapSettings.h
+  s_96e991bbdf10a5::t_af9e011b0c11e4 39,51,89,97,130
+  s_96e991bbdf10a5::t_666814948fb9e6 1-38,40-50,52-88,90-96,98-129,131-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "cd38a800fa2837b5ecca2bec0100970b3581f8a8",
+  "prompts": {},
+  "sessions": {
+    "s_96e991bbdf10a5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea61ce2d-b1fb-413d-b68b-99f700a4d765",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
