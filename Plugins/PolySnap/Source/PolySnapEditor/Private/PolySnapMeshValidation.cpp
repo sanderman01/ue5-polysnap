@@ -162,6 +162,17 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 	const UPolySnapSettings& Settings = UPolySnapSettings::Get();
 	const FBox Bounds = StaticMesh->GetBoundingBox();
 
+	// A mesh asset carries no convention of its own, and this runs from an import hook with no
+	// piece component in sight, so the project default is all there is to check against. A mesh
+	// whose piece overrides it is therefore checked against the wrong convention.
+	//
+	// How wrong depends on which part differs. A Tangent sign flip -- the common case, and what a
+	// socket authored directly in Unreal looks like -- costs nothing: the edge measurement is a
+	// max minus a min along that axis, so its sign cancels. An Outward sign flip or an
+	// Outward/Tangent swap measures a different edge entirely and Errors on a correct asset.
+	// Set DefaultSocketAxes to whichever pipeline the project's assets mostly come from.
+	const FQuat AxisCorrection = FPolySnapGeometry::AxisCorrection(Settings.DefaultSocketAxes);
+
 	int32 FlatAxis = 2;
 	const bool bPlanar = IsPlanar(Bounds, Settings.PlanarExtentRatio, FlatAxis);
 
@@ -210,12 +221,16 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 			SeenIds.Add(Descriptor.Id, Socket->SocketName);
 		}
 
-		const FTransform Transform = SocketTransform(*Socket);
+		const FTransform RawTransform = SocketTransform(*Socket);
+		const FTransform Transform = FPolySnapGeometry::Canonicalise(RawTransform, AxisCorrection);
 		const FPolySnapSocketBasis Basis = FPolySnapGeometry::BasisFromTransform(Transform);
 
 		// -- Hard check 1: the socket's own frame ------------------------------------------
+		// On the raw transform, deliberately: the correction is a rotation, so it would carry a
+		// scale or a shear straight through, but reading what the asset actually stores is the
+		// point of this check and CONVENTIONS.md section 6 says so.
 		double Determinant = 0.0;
-		if (!IsRotationOrthonormal(Transform, Determinant))
+		if (!IsRotationOrthonormal(RawTransform, Determinant))
 		{
 			OutReport.Add(EPolySnapValidationSeverity::Error,
 				FString::Printf(TEXT("Socket '%s' has a scaled, sheared or mirrored frame (scale %s, determinant %.6f). "

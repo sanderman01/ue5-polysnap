@@ -23,6 +23,34 @@ double FPolySnapGeometry::WrapDegrees(double Degrees)
 	return Wrapped;
 }
 
+FQuat FPolySnapGeometry::AxisCorrection(const FPolySnapSocketAxes& Axes)
+{
+	if (!Axes.Validate())
+	{
+		return FQuat::Identity;
+	}
+
+	// FMatrix's four-vector constructor fills M[0], M[1], M[2] in turn, and Unreal multiplies row
+	// vectors, so row N is where canonical axis N ends up. The rows are TransformFromBasis read
+	// forwards: X is Outward, Y is the negated Tangent, Z is Normal. Validate has already
+	// guaranteed the three are a basis, so this is a rotation and not merely close to one.
+	const FMatrix AxisMatrix(PolySnapAxisToVector(Axes.OutwardAxis), -PolySnapAxisToVector(Axes.TangentAxis),
+		Axes.DerivedNormal(), FVector::ZeroVector);
+
+	return AxisMatrix.ToQuat();
+}
+
+FTransform FPolySnapGeometry::Canonicalise(const FTransform& RawSocketTransform, const FQuat& Correction)
+{
+	// FTransform(Correction) * RawSocketTransform, written out. The correction applies first, in
+	// the socket's own frame, which is what relabelling its axes means -- and FQuat composes right
+	// to left where FTransform composes left to right, hence the order. Spelling it out keeps the
+	// location untouched by construction rather than by cancellation, and keeps a per-socket,
+	// per-tick call off FTransform's general multiply path.
+	return FTransform(RawSocketTransform.GetRotation() * Correction, RawSocketTransform.GetTranslation(),
+		RawSocketTransform.GetScale3D());
+}
+
 FPolySnapSocketBasis FPolySnapGeometry::BasisFromTransform(const FTransform& SocketTransform)
 {
 	FPolySnapSocketBasis Basis;

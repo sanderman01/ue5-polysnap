@@ -21,10 +21,14 @@ enum class EPolySnapParseResult : uint8
 /**
  * The socket naming grammar of README section 2.2:
  *
- *     SOCKET_Edge_<ID>_<SubType>_<Size>[.<AuthoringTail>]
- *     SOCKET_Edge_001_Straight_2000.Pent
+ *     SOCKET_Edge_<ID>_<SubType>_<Size>[.<AuthoringTail>]      as authored
+ *     Edge_001_Straight_2000_Pent                              as imported
  *
- * Unreal strips the SOCKET_ prefix at import, so the names this class sees begin at Edge_.
+ * Unreal strips the SOCKET_ prefix at import, so the names this class sees begin at Edge_ -- and
+ * it rewrites the tail's '.' to '_', so the underscore spelling is the only one that ever reaches
+ * here. The head has fixed arity, which is what keeps that unambiguous: four fields, and anything
+ * after them is tail.
+ *
  * Everything here is pure: it takes a string and returns fields, with no engine state involved.
  */
 class POLYSNAP_API FPolySnapSocketName
@@ -36,20 +40,20 @@ public:
 	/** Delimiter between fields. May not appear inside one. */
 	static constexpr TCHAR FieldSeparator = TEXT('_');
 
-	/** Opens the authoring tail. Reserved, and may not appear inside a field. */
-	static constexpr TCHAR TailSeparator = TEXT('.');
-
 	/**
-	 * Splits an authoring tail off a socket name at the FIRST '.'.
+	 * Splits an authoring tail off a socket name: everything past the four-field head.
 	 *
 	 * Blender object names are unique per file rather than per object, so a hex and a pent
 	 * authored together cannot both own SOCKET_Edge_001_Straight_2000 and Blender appends a
-	 * suffix to the second. Everything from the '.' onward is authoring scratch: not identity,
-	 * not compatibility, and read by nothing at runtime.
+	 * suffix to the second. Everything past the head is authoring scratch: not identity, not
+	 * compatibility, and read by nothing at runtime.
+	 *
+	 * The '.' the grammar reserves for the tail does not survive import -- Unreal rewrites it to
+	 * '_' -- so there is nothing to look for but the fifth field.
 	 *
 	 * @param SocketName  The full socket name.
 	 * @param OutHead     The name with the tail removed.
-	 * @param OutTail     The tail, excluding the '.'. Empty when there is none.
+	 * @param OutTail     The tail, excluding its separator. Empty when there is none.
 	 */
 	static void SplitAuthoringTail(FStringView SocketName, FStringView& OutHead, FStringView& OutTail);
 

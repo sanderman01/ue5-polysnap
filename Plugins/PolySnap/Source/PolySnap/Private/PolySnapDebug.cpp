@@ -102,7 +102,10 @@ void FPolySnapDebug::DrawSocket(const UWorld* World, const FTransform& SocketTra
 	const double ArrowHead = ArrowLength * 0.25;
 
 	// The three named directions, drawn in the level so an axis-role mistake in Blender is
-	// visible rather than inferred. Tangent is the socket's negative Y, per CONVENTIONS.md.
+	// visible rather than inferred. These are the resolved roles rather than raw mesh axes --
+	// GetSocketWorldTransform has already applied the piece's convention -- so red is Outward
+	// whichever local axis that piece's assets put it on, and a wrong convention shows up here
+	// as arrows pointing somewhere the panel's geometry says they should not.
 	DrawDebugDirectionalArrow(World, Basis.Location, Basis.Location + Basis.Outward * ArrowLength, ArrowHead,
 		bHighlighted ? HighlightColour : OutwardColour, false, -1.0f, 0, 0.6f);
 	DrawDebugDirectionalArrow(World, Basis.Location, Basis.Location + Basis.Tangent * ArrowLength, ArrowHead,

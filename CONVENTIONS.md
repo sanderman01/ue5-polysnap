@@ -91,6 +91,35 @@ panel's plane the other landed on, and means nothing about inside or outside.
 That person faces +X in both applications. Their left hand is Blender's +Y and Unreal's −Y —
 same hand, same physical direction, opposite sign.
 
+### Assets from another pipeline
+
+The table above is a **default**, not a hard-coded assumption. PolySnap is built to be dropped
+into a project whose panels may not have come from this Blender recipe at all — a socket authored
+directly in the Unreal static mesh editor, for instance, most naturally has `Tangent` on **+Y**,
+because nothing negated it on the way in.
+
+So the mapping is configured in two places:
+
+| Where | Scope |
+| --- | --- |
+| `UPolySnapSettings::DefaultSocketAxes` (Project Settings → Plugins → PolySnap → Conventions) | The project's pipeline. Defaults to the table above. |
+| `Socket Axes` on a piece's `PolySnap Piece` component, behind its override tick-box | One piece whose mesh came from somewhere else. |
+
+**All three roles are declared, and all three are honoured exactly.** That is why the settings are
+strict about the third one: a socket frame is orthonormal with determinant +1, so naming `Outward`
+and `Tangent` already fixes `Normal` down to its sign, and a triad that disagrees about that sign
+is not a basis any socket can have. PolySnap rejects such a mapping and names the axis to flip
+rather than silently honouring two declarations out of three. The Unreal-native example above is
+therefore declared `Outward +X, Tangent +Y, Normal −Z` — which face `Normal` names is arbitrary
+(§2 above), but it has to be the face the other two put it on.
+
+That leaves **24 legal mappings** — six choices of `Outward`, four perpendicular `Tangent`s,
+`Normal` forced — which are exactly the 24 rotations of a cube.
+
+At runtime the mapping is applied once, where a socket transform is read off the mesh
+(`UPolySnapPieceComponent::GetSocketWorldTransform`), and everything downstream works in the
+canonical convention above. Nothing in the snapping math knows the setting exists.
+
 ---
 
 ## 3. Blender authoring
@@ -156,7 +185,9 @@ not the data name, not a custom property.
 
 Follow README §2.2 exactly: `SOCKET_Edge_001_Straight_2000`. Because Blender object names are
 unique per *file*, a socket may also carry an **authoring tail** — anything from a `.` onward,
-which the importer keeps and the parser ignores. Prefer a meaningful one (`.Pent`) over letting
+which the parser ignores. The importer **rewrites that `.` to `_`** (§5), so the tail reaches
+Unreal as a fifth field rather than verbatim, and that fifth field is the only spelling the
+parser knows. Prefer a meaningful one (`.Pent`) over letting
 Blender assign `.001`; the validator warns about the numeric kind (§6).
 
 ### Transforms
@@ -233,8 +264,11 @@ Two consequences of the defaults are worth naming:
 
 Unreal creates static mesh sockets from FBX nodes prefixed `SOCKET_`, stripping the prefix
 (README §2.2). The node must be an FBX null, which is what a parented Blender empty produces.
-Interchange's handling of socket names — specifically the authoring tail — is confirmed on the
-calibration asset (§7).
+**Interchange rewrites the authoring tail's `.` to `_`.** Confirmed on the calibration asset
+(§7 check 5): `SOCKET_Edge_004_Straight_2000.Pent` imports as `Edge_004_Straight_2000_Pent`. The
+parser splits on the fifth field alone and never looks for the `.`, which the head's fixed arity
+of four fields makes unambiguous (README §2.2). Nothing needs to change in the export; the `.` is
+still the right thing to author — it just does not survive the trip.
 
 ---
 
@@ -271,10 +305,18 @@ Everything else is a **warning** a project that authors differently can disable:
 | On a planar piece, every socket Normal ∥ the piece's local +Z | `bWarnOnNonCanonicalPieceFrame` | A panel authored standing, or a socket with stray roll. |
 | On a planar piece, socket `Z` ≈ the piece's mid-thickness | `bWarnOnSocketOffMidPlane` | An origin on a face — the flip-displacement trap (§3). Scoped to planar pieces, so it sits in the same tier as the convention it depends on. |
 | Socket `001`'s Outward ∥ the piece's local +X | `bWarnOnUnalignedPrimarySocket` | A piece not following the canonical-frame rule (§3). |
-| A socket's authoring tail is purely numeric | `bWarnOnNumericAuthoringTail` | Blender assigned the tail itself, so a name collision went unnoticed. Benign, but `.001` reads like the `ID` field. |
+| A socket's authoring tail is purely numeric | `bWarnOnNumericAuthoringTail` | Blender assigned the tail itself, so a name collision went unnoticed. Benign, but the `_001` it imports as reads like the `ID` field. |
 
 All of them live in PolySnap's own `UDeveloperSettings`, not in project config — the plugin
 ships its conventions with it and a downstream project overrides them locally.
+
+**The validator checks against `DefaultSocketAxes` only.** It runs from an import hook, on a
+`UStaticMesh`, with no piece component to ask — so a mesh whose piece overrides the socket axis
+mapping (§2) is checked against the project's convention rather than its own. A `Tangent` sign
+difference costs nothing, because the edge-length measurement is a max minus a min along that
+axis and the sign cancels; an `Outward` sign difference or an `Outward`/`Tangent` swap measures a
+different edge and **errors on a correct asset**. Set `DefaultSocketAxes` to whichever pipeline
+the project's assets mostly come from.
 
 ### What is deliberately not checked
 
@@ -327,8 +369,8 @@ came from the pipeline and nothing else. Author per §3, export per §4, import 
    seam artefact here is an axis or scale error, not a snapping bug; there is no snapping yet.
    Re-run it as milestone 1's first test once the snapper exists.
 5. **Authoring tail.** Re-export with the socket renamed `SOCKET_Edge_001_Straight_2000.Pent`.
-   It imports with the tail intact and parses to ID `001`, confirming the importer neither
-   mangles nor swallows the `.` (README §2.2).
+   It imports as `Edge_001_Straight_2000_Pent` — the importer **rewrites the `.` to `_`** rather
+   than preserving or swallowing it — and still parses to ID `001` (README §2.2). Confirmed.
 6. **Foreign socket.** Add a second empty named `SOCKET_Mount_A` and re-export. It imports as a
    socket, and PolySnap ignores it without a diagnostic (README §2.2). Confirms the plugin can
    share a mesh with another system, which is the whole basis for equipment living elsewhere.

@@ -10,13 +10,38 @@
  * engine state, no world. This is the part Milestone 1 exists to prove, and it is deliberately
  * reachable from an automation spec without spawning anything.
  *
- * Every function here obeys CONVENTIONS.md section 2: Outward is socket-local +X, Tangent is
- * socket-local MINUS Y, Normal is +Z, and Unreal's cross product gives Normal == Tangent ^
- * Outward rather than the other way round.
+ * Every function from BasisFromTransform down obeys one canonical convention: Outward is
+ * socket-local +X, Tangent is socket-local MINUS Y, Normal is +Z, and Unreal's cross product
+ * gives Normal == Tangent ^ Outward rather than the other way round. That is CONVENTIONS.md
+ * section 2's table, and the default a project ships with.
+ *
+ * An asset may be authored to any of the 24 legal mappings instead, so callers put a socket
+ * transform through Canonicalise first and everything below is spared knowing about it.
+ * AxisCorrection is the only function here that reads an FPolySnapSocketAxes.
  */
 class POLYSNAP_API FPolySnapGeometry
 {
 public:
+	/**
+	 * The socket-local rotation that re-expresses a socket authored to Axes in the canonical
+	 * convention. Identity for the canonical convention itself, so the default path is a no-op.
+	 *
+	 * Every legal mapping is one of the 24 rotations of a cube, so the result is exact. An
+	 * illegal one returns identity rather than the singular frame its axes would otherwise
+	 * build -- FTransform would turn that into a normalised quaternion of nonsense, which is
+	 * far harder to notice than a piece that simply did not move.
+	 */
+	[[nodiscard]] static FQuat AxisCorrection(const FPolySnapSocketAxes& Axes);
+
+	/**
+	 * A socket transform as read off a mesh, re-expressed canonically.
+	 *
+	 * The socket does not move and does not turn; only which of its axes carries which role
+	 * changes. Pass the correction in rather than the axes: this runs once per socket per tick
+	 * for every piece near the player, and the correction is worth caching.
+	 */
+	[[nodiscard]] static FTransform Canonicalise(const FTransform& RawSocketTransform, const FQuat& Correction);
+
 	/** Resolves a socket transform into its three named directions. Scale is ignored; it must be 1. */
 	[[nodiscard]] static FPolySnapSocketBasis BasisFromTransform(const FTransform& SocketTransform);
 

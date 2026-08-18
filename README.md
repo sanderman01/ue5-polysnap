@@ -75,7 +75,9 @@ SOCKET_Edge_001_Straight_2000.Pent
 ```
 
 After import the engine strips the `SOCKET_` prefix, so the socket is named
-`Edge_001_Straight_2000`.
+`Edge_001_Straight_2000`. It also **rewrites the tail's `.` to `_`**, so the second example
+above arrives as `Edge_001_Straight_2000_Pent` — the underscore spelling is the only one the
+parser ever sees. See the authoring tail below.
 
 | Field | Example | Meaning |
 | --- | --- | --- |
@@ -84,7 +86,7 @@ After import the engine strips the `SOCKET_` prefix, so the socket is named
 | `ID` | `001` | Identity within the piece. Three digits, zero-padded, `001`–`999`. |
 | `SubType` | `Straight` | Edge geometry. **Only `Straight` is in scope** — curves and circles are a later extension. |
 | `Size` | `2000` | Nominal edge length in **millimetres**. Bare integer, no zero-padding, no fixed width. A compatibility token, not a measurement — see below. |
-| `.<Tail>` | `.Pent` | Optional. Everything from the first `.` onward is authoring scratch: ignored by the parser, never identity and never compatibility — see below. |
+| `.<Tail>` | `.Pent` | Optional. Everything past the four-field head is authoring scratch: ignored by the parser, never identity and never compatibility — see below. |
 
 **`SOCKET_Edge_<ID>` is a fixed-arity head; everything after it is of variable arity.** This is
 why the ID sits third rather than last: when curved edges arrive they will need more than one
@@ -170,9 +172,9 @@ expressed as "name plus one number" at all. The compatibility key is the tuple e
 
 #### The authoring tail
 
-**Everything from the first `.` to the end of the name is ignored.** It is not identity, not
-compatibility, and nothing at runtime reads it. `Edge_001_Straight_2000.Pent` and
-`Edge_001_Straight_2000` are the same socket as far as PolySnap is concerned.
+**Everything past the four-field head is ignored.** It is not identity, not compatibility, and
+nothing at runtime reads it. `SOCKET_Edge_001_Straight_2000.Pent` and
+`SOCKET_Edge_001_Straight_2000` are the same socket as far as PolySnap is concerned.
 
 It exists because **Blender object names are unique per `.blend` file, not per object**, and
 collections do not namespace them. A hex and a pent authored in the same file therefore cannot
@@ -188,6 +190,19 @@ invites the misreading described below, which is why the validator warns about i
 
 Because the tail is not identity, renaming `.Pent` to `.Pentagon` is free and does not touch
 save games (§2.9).
+
+**The importer does not preserve the `.`.** `SOCKET_Edge_004_Straight_2000.Pent` lands in the
+content browser as `Edge_004_Straight_2000_Pent`, so on any imported asset the tail is simply a
+fifth underscore-separated field and the reserved character is not there to find. The parser
+therefore does not look for it at all: it splits on the fifth field and nothing else, which the
+fixed-arity head above makes unambiguous. A name that still carries a `.` did not come through
+this pipeline, and fails to parse rather than being accommodated by a second code path no asset
+exercises.
+
+The cost is that a genuine typo of the form `Edge_001_Straight_2000_Extra` now parses as a
+socket with the tail `Extra` rather than failing as a field-count error. That trade is forced —
+after import the two are the same string — and it is the reason the head's arity is fixed rather
+than merely conventional.
 
 #### Field rules
 
@@ -205,7 +220,8 @@ save games (§2.9).
   never reused. `Size` has no such ordering to protect and a fixed width would only invite a
   four-digit assumption that `Straight_500` and `Straight_12000` both break.
 - **No underscores inside a field.** The underscore is the delimiter.
-- **`.` is reserved.** It opens the authoring tail and may not appear inside any field.
+- **`.` is reserved.** It opens the authoring tail as authored, and may not appear inside any
+  field. Import rewrites it to `_`, so it is a rule about the `.blend`, not about the asset.
 - **Case:** write the prefix as `SOCKET_`. The importer's comparison is case-insensitive, so
   `Socket_` also works, but there is no reason to depend on that.
 
@@ -254,8 +270,9 @@ Each edge socket defines an orthonormal basis:
   arbitrary authoring convention; it does **not** mean "outside of the structure" (§2.6).
 
 Which local axis carries which role — in Unreal, `Outward` is socket-local **+X**, `Tangent`
-**−Y**, `Normal` **+Z** — is fixed in [CONVENTIONS.md](CONVENTIONS.md), together with the
-Blender authoring recipe and the export settings that make the two agree. Note the sign:
+**−Y**, `Normal` **+Z** — is the **default**, set out in [CONVENTIONS.md](CONVENTIONS.md)
+together with the Blender authoring recipe and the export settings that make the two agree. A
+mesh from another pipeline declares its own mapping instead (CONVENTIONS.md §2). Note the sign:
 `Tangent` is the socket's **−Y**, so every expression below means that derived vector, never
 `GetUnitAxis(EAxis::Y)`. The mapping is a convention, not a design decision; this section only
 depends on the three directions existing and being orthonormal.

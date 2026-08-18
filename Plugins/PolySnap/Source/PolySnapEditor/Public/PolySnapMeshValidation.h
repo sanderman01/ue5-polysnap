@@ -64,6 +64,10 @@ public:
 	 * mesh bounds instead would be right for a rectangle and wrong for the hexagon Milestone 2
 	 * needs, where the bounds along an edge direction are the whole panel's width.
 	 *
+	 * SocketTransform must already be in the canonical axis convention -- run it through
+	 * FPolySnapGeometry::Canonicalise first, or Outward and Tangent name the wrong directions and
+	 * this measures some other edge without complaining.
+	 *
 	 * @return false when too few vertices lie on that edge to measure it.
 	 */
 	[[nodiscard]] static bool MeasureEdgeLengthUu(const UStaticMesh* StaticMesh, const FTransform& SocketTransform,

@@ -8,6 +8,8 @@
 #include "Engine/StaticMeshSocket.h"
 #include "GameFramework/Actor.h"
 #include "PolySnap.h"
+#include "PolySnapGeometry.h"
+#include "PolySnapSettings.h"
 #include "PolySnapSocketName.h"
 #include "PolySnapSubsystem.h"
 
@@ -49,10 +51,41 @@ void UPolySnapPieceComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+#if WITH_EDITOR
+void UPolySnapPieceComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	// The cache is built once at BeginPlay, so without this an axis convention changed while a PIE
+	// session is running keeps snapping to the old one -- which reads as the setting not working.
+	RebuildSocketCache();
+}
+#endif
+
+FPolySnapSocketAxes UPolySnapPieceComponent::GetEffectiveSocketAxes() const
+{
+	return bOverrideSocketAxes ? SocketAxes : UPolySnapSettings::Get().DefaultSocketAxes;
+}
+
 void UPolySnapPieceComponent::RebuildSocketCache()
 {
 	SocketDescriptors.Reset();
 	ResolvedSocketMesh = SocketMesh;
+
+	FPolySnapSocketAxes EffectiveAxes = GetEffectiveSocketAxes();
+	FString AxesError;
+	if (!EffectiveAxes.Validate(&AxesError))
+	{
+		// Loud, and then carry on with the default. A piece that refused to snap at all would be
+		// a worse diagnostic than one that snaps to the convention the rest of the project uses.
+		UE_LOG(LogPolySnap, Error,
+			TEXT("PolySnap piece on '%s' has an impossible socket axis convention. %s"), *GetNameSafe(GetOwner()),
+				*AxesError);
+
+		EffectiveAxes = FPolySnapSocketAxes();
+	}
+
+	SocketAxisCorrection = FPolySnapGeometry::AxisCorrection(EffectiveAxes);
 
 	if (ResolvedSocketMesh == nullptr)
 	{
@@ -118,7 +151,8 @@ FTransform UPolySnapPieceComponent::GetSocketWorldTransform(FName SocketName) co
 		return FTransform::Identity;
 	}
 
-	return ResolvedSocketMesh->GetSocketTransform(SocketName, RTS_World);
+	return FPolySnapGeometry::Canonicalise(ResolvedSocketMesh->GetSocketTransform(SocketName, RTS_World),
+		SocketAxisCorrection);
 }
 
 FTransform UPolySnapPieceComponent::GetPieceTransform() const

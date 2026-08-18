@@ -30,9 +30,30 @@ public:
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
 	//~ End UActorComponent interface
 
+#if WITH_EDITOR
+	//~ Begin UObject interface
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+	//~ End UObject interface
+#endif
+
 	/** The mesh whose sockets this piece owns. Null means "the owner's first mesh component". */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PolySnap")
 	TObjectPtr<UMeshComponent> SocketMesh;
+
+	/**
+	 * Tick when this piece's mesh was authored to a different socket axis convention than the
+	 * project default. Leave it off and the piece follows UPolySnapSettings::DefaultSocketAxes.
+	 */
+	UPROPERTY(EditAnywhere, Category = "PolySnap", meta = (InlineEditConditionToggle))
+	bool bOverrideSocketAxes = false;
+
+	/** Which socket-local axis carries which role on this piece's mesh. CONVENTIONS.md section 2. */
+	UPROPERTY(EditAnywhere, Category = "PolySnap", meta = (EditCondition = "bOverrideSocketAxes"))
+	FPolySnapSocketAxes SocketAxes;
+
+	/** The convention in force: this piece's override if it has one, otherwise the project default. */
+	UFUNCTION(BlueprintPure, Category = "PolySnap")
+	FPolySnapSocketAxes GetEffectiveSocketAxes() const;
 
 	/** The mesh the sockets were actually read from, resolved at BeginPlay. */
 	UFUNCTION(BlueprintPure, Category = "PolySnap")
@@ -47,7 +68,15 @@ public:
 	/** Every socket on this piece, resolved into world space, appended to OutSockets. */
 	void AppendWorldSockets(TArray<FPolySnapWorldSocket>& OutSockets) const;
 
-	/** The transform of one socket in world space. Identity when the socket is not on the mesh. */
+	/**
+	 * The transform of one socket in world space, in the canonical axis convention. Identity when
+	 * the socket is not on the mesh.
+	 *
+	 * The only way to reach a socket transform. Everything downstream -- the query, the debug
+	 * draw, the builder's constraint -- assumes the canonical convention, and this is where a
+	 * piece's own convention is applied; a caller that goes to the mesh component directly gets
+	 * raw axes and silently wrong snapping.
+	 */
 	[[nodiscard]] FTransform GetSocketWorldTransform(FName SocketName) const;
 
 	/** The piece's own transform -- its owning actor's. What a solved placement is expressed in. */
@@ -78,4 +107,7 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMeshComponent> ResolvedSocketMesh;
+
+	/** AxisCorrection of the effective convention, resolved in RebuildSocketCache and reused. */
+	FQuat SocketAxisCorrection = FQuat::Identity;
 };

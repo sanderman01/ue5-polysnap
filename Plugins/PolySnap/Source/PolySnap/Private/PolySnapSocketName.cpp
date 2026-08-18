@@ -56,17 +56,25 @@ void SetError(FString* OutError, FStringView SocketName, const FString& Reason)
 
 void FPolySnapSocketName::SplitAuthoringTail(FStringView SocketName, FStringView& OutHead, FStringView& OutTail)
 {
-	int32 TailStart = INDEX_NONE;
-	if (SocketName.FindChar(TailSeparator, TailStart))
+	using namespace PolySnapSocketNamePrivate;
+
+	// Import rewrites the authored '.' to '_', so by the time a name reaches this parser the tail
+	// is just a fifth underscore-separated field. There is no separator left to distinguish it by;
+	// the head's fixed arity is the whole of the rule, and is why the grammar puts the variable
+	// part last rather than letting the head grow.
+	int32 Remaining = StraightFieldCount;
+	for (int32 Index = 0; Index < SocketName.Len(); ++Index)
 	{
-		OutHead = SocketName.Left(TailStart);
-		OutTail = SocketName.RightChop(TailStart + 1);
+		if (SocketName[Index] == FieldSeparator && --Remaining == 0)
+		{
+			OutHead = SocketName.Left(Index);
+			OutTail = SocketName.RightChop(Index + 1);
+			return;
+		}
 	}
-	else
-	{
-		OutHead = SocketName;
-		OutTail = FStringView();
-	}
+
+	OutHead = SocketName;
+	OutTail = FStringView();
 }
 
 bool FPolySnapSocketName::IsPolySnapSocket(FStringView SocketName)

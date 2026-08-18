@@ -67,11 +67,14 @@ void FPolySnapSocketNameSpec::Define()
 	Describe("the authoring tail",
 		[this]()
 		{
+			// Every name here is in the imported spelling. Unreal rewrites the '.' the grammar
+			// reserves to '_', so a UStaticMesh only ever carries a fifth underscore-separated
+			// field and the head's fixed arity is the whole of the rule.
 			It("is ignored, so a tailed and an untailed name are the same socket",
 				[this]()
 				{
-					TestEqual("result", ParseName(TEXT("Edge_001_Straight_2000.Pent")), TEXT("Parsed"));
-					TestEqual("id", Descriptor.Id, 1);
+					TestEqual("result", ParseName(TEXT("Edge_004_Straight_2000_Pent")), TEXT("Parsed"));
+					TestEqual("id", Descriptor.Id, 4);
 					TestEqual("size", Descriptor.SizeMillimetres, 2000);
 				});
 
@@ -79,16 +82,10 @@ void FPolySnapSocketNameSpec::Define()
 				[this]()
 				{
 					// The suffix is a symptom; the duplicated ID it implies is the error, and that is
-					// detected separately, per piece, on stripped names.
-					TestEqual("result", ParseName(TEXT("Edge_003_Straight_2000.001")), TEXT("Parsed"));
+					// detected separately, per piece, on stripped names. The validator's numeric-tail
+					// warning reads this same split, so it fires on the imported _001 too.
+					TestEqual("result", ParseName(TEXT("Edge_003_Straight_2000_001")), TEXT("Parsed"));
 					TestEqual("id", Descriptor.Id, 3);
-				});
-
-			It("starts at the first dot, so a second dot is still tail",
-				[this]()
-				{
-					TestEqual("result", ParseName(TEXT("Edge_001_Straight_2000.Pent.001")), TEXT("Parsed"));
-					TestEqual("id", Descriptor.Id, 1);
 				});
 
 			It("splits into head and tail",
@@ -96,10 +93,33 @@ void FPolySnapSocketNameSpec::Define()
 				{
 					FStringView Head;
 					FStringView Tail;
-					FPolySnapSocketName::SplitAuthoringTail(TEXT("Edge_001_Straight_2000.Pent"), Head, Tail);
+					FPolySnapSocketName::SplitAuthoringTail(TEXT("Edge_004_Straight_2000_Pent"), Head, Tail);
+
+					TestEqual("head", FString(Head), TEXT("Edge_004_Straight_2000"));
+					TestEqual("tail", FString(Tail), TEXT("Pent"));
+				});
+
+			It("keeps a multi-part tail together",
+				[this]()
+				{
+					// SOCKET_Edge_001_Straight_2000.Pent.001 with both dots rewritten. The tail is
+					// everything past field four, however many underscores it contains.
+					FStringView Head;
+					FStringView Tail;
+					FPolySnapSocketName::SplitAuthoringTail(TEXT("Edge_001_Straight_2000_Pent_001"), Head, Tail);
 
 					TestEqual("head", FString(Head), TEXT("Edge_001_Straight_2000"));
-					TestEqual("tail", FString(Tail), TEXT("Pent"));
+					TestEqual("tail", FString(Tail), TEXT("Pent_001"));
+				});
+
+			It("is not looked for by its authored separator, which cannot reach a mesh",
+				[this]()
+				{
+					// A '.' survives neither Blender's exporter nor Unreal's importer, so a name
+					// still carrying one did not come from the pipeline CONVENTIONS.md specifies.
+					// Failing on the size field is the honest outcome: better a loud error than a
+					// second, untested spelling kept alive in the parser.
+					TestEqual("result", ParseName(TEXT("Edge_001_Straight_2000.Pent")), TEXT("Malformed"));
 				});
 		});
 
@@ -152,8 +172,9 @@ void FPolySnapSocketNameSpec::Define()
 			It("rejects the wrong number of fields",
 				[this]()
 				{
+					// Only "too few" is a count error now. A fifth field is an imported authoring
+					// tail, not a typo -- see "the authoring tail" below for why that is forced.
 					TestEqual("too few", ParseName(TEXT("Edge_001_Straight")), TEXT("Malformed"));
-					TestEqual("too many", ParseName(TEXT("Edge_001_Straight_2000_Extra")), TEXT("Malformed"));
 					TestEqual("empty field", ParseName(TEXT("Edge_001__2000")), TEXT("Malformed"));
 				});
 		});

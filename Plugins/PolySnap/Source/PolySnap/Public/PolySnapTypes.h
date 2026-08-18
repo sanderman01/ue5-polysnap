@@ -69,6 +69,88 @@ struct POLYSNAP_API FPolySnapSocketDescriptor
 };
 
 /**
+ * One signed socket-local axis, as spelled in CONVENTIONS.md section 2's table.
+ *
+ * Six values rather than three plus a separate sign: a role is a direction, not a line, and it is
+ * Tangent's sign that decides which polarity counts as Aligned.
+ */
+UENUM(BlueprintType)
+enum class EPolySnapSocketAxis : uint8
+{
+	PlusX,
+	MinusX,
+	PlusY,
+	MinusY,
+	PlusZ,
+	MinusZ
+};
+
+/**
+ * Which socket-local axis carries which role, for one authoring pipeline.
+ *
+ * The defaults are CONVENTIONS.md section 2's table: panels authored in Blender and exported
+ * through the default FBX settings, where the right-to-left-handed conversion negates Y. A mesh
+ * that came from anywhere else declares its own mapping rather than being re-exported, which is
+ * what stops the plugin assuming this project's pipeline.
+ *
+ * All three roles are declared, and all three are honoured exactly -- which is why Validate is
+ * strict about handedness. A socket frame is orthonormal with determinant +1, so naming Outward
+ * and Tangent already determines Normal down to its sign; a triad that disagrees about that sign
+ * cannot be realised, and only one of the three declarations could survive. Rather than silently
+ * pick one and leave a dropdown that does nothing, Validate rejects the pair and says which axis
+ * to flip. Every accepted mapping therefore means precisely what it says.
+ *
+ * That leaves 24 legal mappings -- 6 choices of Outward, 4 of Tangent, Normal forced -- which are
+ * exactly the 24 rotations of a cube.
+ */
+USTRUCT(BlueprintType)
+struct POLYSNAP_API FPolySnapSocketAxes
+{
+	GENERATED_BODY()
+
+	/** In the plane of the panel, perpendicular to the edge, away from the piece's centre. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PolySnap")
+	EPolySnapSocketAxis OutwardAxis = EPolySnapSocketAxis::PlusX;
+
+	/** Along the edge. Its sign is what decides which polarity is Aligned. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PolySnap")
+	EPolySnapSocketAxis TangentAxis = EPolySnapSocketAxis::MinusY;
+
+	/** The panel's surface normal. Which face is arbitrary, but it must agree with the other two. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PolySnap")
+	EPolySnapSocketAxis NormalAxis = EPolySnapSocketAxis::PlusZ;
+
+	/**
+	 * True when these three roles describe a basis a socket can actually have: three different
+	 * base axes, and a Normal on the side the other two put it. OutError explains which rule
+	 * failed and what to change.
+	 */
+	[[nodiscard]] bool Validate(FString* OutError = nullptr) const;
+
+	/**
+	 * The Normal that Outward and Tangent imply, whatever NormalAxis says.
+	 *
+	 * Tangent ^ Outward, the same formula MatedBasis uses -- Unreal's cross product is the plain
+	 * right-hand formula while its coordinate system is left-handed, so the physically
+	 * right-handed triad computes in this order. Zero when Outward and Tangent share an axis.
+	 */
+	[[nodiscard]] FVector DerivedNormal() const;
+
+	[[nodiscard]] bool operator==(const FPolySnapSocketAxes& Other) const
+	{
+		return OutwardAxis == Other.OutwardAxis && TangentAxis == Other.TangentAxis && NormalAxis == Other.NormalAxis;
+	}
+
+	[[nodiscard]] bool operator!=(const FPolySnapSocketAxes& Other) const { return !(*this == Other); }
+};
+
+/** The unit vector an axis names. */
+[[nodiscard]] POLYSNAP_API FVector PolySnapAxisToVector(EPolySnapSocketAxis Axis);
+
+/** "+X", "-Y" and so on -- CONVENTIONS.md section 2's notation, and what the specs assert on. */
+[[nodiscard]] POLYSNAP_API const TCHAR* PolySnapAxisToString(EPolySnapSocketAxis Axis);
+
+/**
  * The orthonormal basis a socket defines (README section 2.3), resolved from a socket transform.
  *
  * Which local axis carries which role is fixed in CONVENTIONS.md section 2. Note Tangent: it is

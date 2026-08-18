@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
+#include "PolySnapTypes.h"
 
 #include "PolySnapSettings.generated.h"
 
@@ -32,6 +33,18 @@ public:
 	//~ Begin UDeveloperSettings interface
 	virtual FName GetCategoryName() const override;
 	//~ End UDeveloperSettings interface
+
+	// -- Conventions, CONVENTIONS.md section 2 ----------------------------------------------
+
+	/**
+	 * Which socket-local axis carries which role, for every piece that does not override it.
+	 *
+	 * The default is CONVENTIONS.md section 2's table, which is what the Blender pipeline in
+	 * sections 3 to 5 produces. Set this to whichever pipeline the project's assets mostly come
+	 * from: the import validator has no piece component to ask and checks against this alone.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Conventions")
+	FPolySnapSocketAxes DefaultSocketAxes;
 
 	// -- Snapping ---------------------------------------------------------------------------
 
