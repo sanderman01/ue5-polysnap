@@ -359,7 +359,7 @@ came from the pipeline and nothing else. Author per §3, export per §4, import 
 1. **Scale.** The mesh bounds read **200 × 200 × 4 uu**.
 2. **Socket position.** The socket sits at **`(100, 0, 0)`** in the static mesh editor — Blender
    `(1.0, 0, 0)` is one metre along +X, which is 100 uu along Unreal +X.
-3. **Socket axes.** Its rotation is **identity**, and the gizmo reads: **red (+X)** points away
+3. **Socket axes.** The gizmo reads: **red (+X)** points away
    from the panel in its plane (Outward), **green (+Y)** runs along the edge — its **negative**
    is Tangent (§2) — and **blue (+Z)** is the surface normal.
 4. **Round trip, by hand.** This one needs no code. Place instance A at the world origin, and

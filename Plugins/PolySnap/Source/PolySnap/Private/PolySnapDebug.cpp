@@ -105,9 +105,11 @@ void FPolySnapDebug::DrawSocket(const UWorld* World, const FTransform& SocketTra
 	// visible rather than inferred. These are the resolved roles rather than raw mesh axes --
 	// GetSocketWorldTransform has already applied the piece's convention -- so red is Outward
 	// whichever local axis that piece's assets put it on, and a wrong convention shows up here
-	// as arrows pointing somewhere the panel's geometry says they should not.
+	// as arrows pointing somewhere the panel's geometry says they should not. The arrow colours
+	// are never overridden -- the held piece is signalled by the socket sphere below, so the
+	// axis legend still reads on the one piece whose convention you are most likely checking.
 	DrawDebugDirectionalArrow(World, Basis.Location, Basis.Location + Basis.Outward * ArrowLength, ArrowHead,
-		bHighlighted ? HighlightColour : OutwardColour, false, -1.0f, 0, 0.6f);
+		OutwardColour, false, -1.0f, 0, 0.6f);
 	DrawDebugDirectionalArrow(World, Basis.Location, Basis.Location + Basis.Tangent * ArrowLength, ArrowHead,
 		TangentColour, false, -1.0f, 0, 0.6f);
 	DrawDebugDirectionalArrow(World, Basis.Location, Basis.Location + Basis.Normal * ArrowLength, ArrowHead,
