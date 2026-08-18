@@ -21,6 +21,7 @@ Checks: >
   -bugprone-implicit-widening-of-multiplication-result,
   -bugprone-forward-declaration-namespace,
   -bugprone-throwing-static-initialization,
+  -bugprone-derived-method-shadowing-base-method,
 
   concurrency-*,
 
@@ -35,7 +36,6 @@ Checks: >
   modernize-use-equals-default,
   modernize-use-equals-delete,
   modernize-use-nullptr,
-  modernize-use-override,
   modernize-use-using,
 
   readability-avoid-const-params-in-decls,
@@ -72,6 +72,10 @@ Checks: >
 # friends expand to exactly the pattern it flags: the diagnostic points at our .cpp but the
 # construct is entirely the engine's.
 #
+# bugprone-derived-method-shadowing-base-method is off for the same reason: DECLARE_CLASS2,
+# reached through GENERATED_BODY(), declares operator new/delete on every UCLASS, so every
+# UObject subclass "shadows" its parent. It fires on the macro, not on anything we wrote.
+#
 # Deliberately absent, so nobody re-adds them by accident:
 #   clang-analyzer-*      the path-sensitive analyzer costs minutes per UE translation unit.
 #                         Tools/tidy.sh --analyze turns it on for a targeted run.
@@ -83,6 +87,11 @@ Checks: >
 #                         base class, not the token). Enforced by review, not by tooling.
 #   modernize-use-trailing-return-type, modernize-avoid-c-arrays, modernize-pass-by-value,
 #   modernize-use-nodiscard, modernize-return-braced-init-list  — conflict with Epic's style.
+#   modernize-use-override  same: it calls `virtual` redundant next to `override`, but Epic's
+#                         standard requires both and the engine writes them that way. The half
+#                         worth keeping — a missing `override` — is already covered by clang's
+#                         own -Winconsistent-missing-override, which UBT enables for this
+#                         toolchain (see UBT CppCompileWarnings.cs).
 #   cppcoreguidelines-*, google-*, llvm-*  — assume the STL and LLVM's own conventions.
 
 # Left empty on purpose: a bare run then reports only the .cpp itself. Tools/tidy.sh passes
