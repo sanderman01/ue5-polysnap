@@ -1,0 +1,19 @@
+.clang-tidy
+  s_e26cbda48913f8::t_0ca147b466ff8f 24,75-78,90-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "da88b38c5fd57dadc223b551d1f9fb27bcc7301c",
+  "prompts": {},
+  "sessions": {
+    "s_e26cbda48913f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8013357f-aa91-44b9-b3c6-7a713194fabb",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
