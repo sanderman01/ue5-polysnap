@@ -1,0 +1,62 @@
+Source/Sandbox/SandboxCharacter.cpp
+  s_e92810181acc76::t_9739f2d765e771 3,18,23,33,38,61,65,77,101,124,131,136,141
+  s_e92810181acc76::t_7987a8340427d1 16,84-86
+.claude/skills/clang-tools/SKILL.md
+  s_e92810181acc76::t_c8c1a68c295a44 26,64
+.claude/skills/clangd-database/SKILL.md
+  s_e92810181acc76::t_0ab599d8ff3913 13-14,25,45,52
+Source/PolySnapSandboxEditor.Target.cs
+  s_e92810181acc76::t_1733e1d06e6333 6,8,14
+Makefile
+  s_e92810181acc76::t_d53c540023bc86 7-19,48,50,53-54,56-57,59-60,62-63,65-66,68-69,71-72,74-75,77-78,80,82-83,85-86,88,144
+PolySnapSandbox.uproject
+  s_e92810181acc76::t_1733e1d06e6333 8
+Plugins/PolySnap/PolySnap.uplugin
+  s_e92810181acc76::t_fc9515ca094b7b 33-38
+README.md
+  s_e92810181acc76::t_dd6607850a5329 1,702,749,752
+.clang-tidy
+  s_e92810181acc76::t_dd6607850a5329 1
+CLAUDE.md
+  s_e92810181acc76::t_dd6607850a5329 1,26,32,36-37,42,45,60
+.clang-format
+  s_e92810181acc76::t_dd6607850a5329 1
+Source/Sandbox/SandboxCharacter.h
+  s_e92810181acc76::t_9739f2d765e771 8,15,28,33
+Source/Sandbox/Sandbox.cpp
+  s_e92810181acc76::t_9739f2d765e771 3,7,9
+Config/DefaultGame.ini
+  s_e92810181acc76::t_c86b546d89e58e 3
+Source/PolySnapSandbox.Target.cs
+  s_e92810181acc76::t_1733e1d06e6333 6,8,14
+Tools/tidy.sh
+  s_e92810181acc76::t_d539c2957bdbcb 24,33-34
+Source/Sandbox/Sandbox.h
+  s_e92810181acc76::t_9739f2d765e771 8-9
+CODE_STYLE.md
+  s_e92810181acc76::t_dd6607850a5329 7
+.claude/skills/unreal-build/SKILL.md
+  s_e92810181acc76::t_81f894fa424309 3,6,13,30,37-38,41,61
+.claude/skills/automation-tests/SKILL.md
+  s_e92810181acc76::t_3553c106d81a8f 6,27-28,35,59
+Config/DefaultEngine.ini
+  s_e92810181acc76::t_c86b546d89e58e 88-91,118-124
+Source/Sandbox/Sandbox.Build.cs
+  s_e92810181acc76::t_9739f2d765e771 5,7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "cee91137d9c1d386482bdc79b9dba5a00f040762",
+  "prompts": {},
+  "sessions": {
+    "s_e92810181acc76": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6da0e51a-f6b4-4635-a296-10ce0e82b547",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
