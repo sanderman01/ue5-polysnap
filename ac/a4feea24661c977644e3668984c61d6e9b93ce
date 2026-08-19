@@ -1,0 +1,14 @@
+README.md
+  h_72decab43bbb75 3-5,13-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "aca4feea24661c977644e3668984c61d6e9b93ce",
+  "prompts": {},
+  "humans": {
+    "h_72decab43bbb75": {
+      "author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
