@@ -5,14 +5,14 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 
-#include "ConstructionCharacter.generated.h"
+#include "SandboxCharacter.generated.h"
 
 class UInputAction;
 class UInputMappingContext;
 struct FInputActionValue;
 
 /**
- * First-person character for the Construction playtest level.
+ * First-person character for the Sandbox playtest level.
  *
  * Its only current behaviour is a debug free-flight mode: the character movement component is
  * put into MOVE_Flying and tuned to stop the instant input is released, so panels can be
@@ -25,12 +25,12 @@ struct FInputActionValue;
  * so that no extra Input Action assets are needed.
  */
 UCLASS()
-class AConstructionCharacter : public ACharacter
+class ASandboxCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
 public:
-	AConstructionCharacter();
+	ASandboxCharacter();
 
 	//~ Begin AActor interface
 	virtual void BeginPlay() override;

@@ -4,19 +4,19 @@
 UNREALROOTPATH = /home/sander/UnrealEngine_5_8_1
 
 TARGETS = \
-	Construction-Android-DebugGame  \
-	Construction-Android-Development  \
-	Construction-Android-Shipping  \
-	Construction-Linux-DebugGame  \
-	Construction-Linux-Development  \
-	Construction-Linux-Shipping  \
-	Construction-LinuxArm64-DebugGame  \
-	Construction-LinuxArm64-Development  \
-	Construction-LinuxArm64-Shipping  \
-	Construction \
-	ConstructionEditor-Linux-DebugGame  \
-	ConstructionEditor-Linux-Development  \
-	ConstructionEditor \
+	PolySnapSandbox-Android-DebugGame  \
+	PolySnapSandbox-Android-Development  \
+	PolySnapSandbox-Android-Shipping  \
+	PolySnapSandbox-Linux-DebugGame  \
+	PolySnapSandbox-Linux-Development  \
+	PolySnapSandbox-Linux-Shipping  \
+	PolySnapSandbox-LinuxArm64-DebugGame  \
+	PolySnapSandbox-LinuxArm64-Development  \
+	PolySnapSandbox-LinuxArm64-Shipping  \
+	PolySnapSandbox \
+	PolySnapSandboxEditor-Linux-DebugGame  \
+	PolySnapSandboxEditor-Linux-Development  \
+	PolySnapSandboxEditor \
 	ChaosTestHarness \
 	LiveLinkHub-Linux-DebugGame  \
 	LiveLinkHub-Linux-Development  \
@@ -45,47 +45,47 @@ all: StandardSet
 
 RequiredTools: CrashReportClient-Linux-Shipping CrashReportClientEditor-Linux-Shipping ShaderCompileWorker UnrealLightmass EpicWebHelper-Linux-Shipping
 
-StandardSet: RequiredTools UnrealFrontend ConstructionEditor UnrealInsights
+StandardSet: RequiredTools UnrealFrontend PolySnapSandboxEditor UnrealInsights
 
-DebugSet: RequiredTools UnrealFrontend-Linux-Debug ConstructionEditor-Linux-Debug
+DebugSet: RequiredTools UnrealFrontend-Linux-Debug PolySnapSandboxEditor-Linux-Debug
 
 
-Construction-Android-DebugGame:
-	 $(BUILD) Construction Android DebugGame  -Project="/home/sander/dev/unreal/Construction/Construction.uproject" $(ARGS)
+PolySnapSandbox-Android-DebugGame:
+	 $(BUILD) PolySnapSandbox Android DebugGame  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" $(ARGS)
 
-Construction-Android-Development:
-	 $(BUILD) Construction Android Development  -Project="/home/sander/dev/unreal/Construction/Construction.uproject" $(ARGS)
+PolySnapSandbox-Android-Development:
+	 $(BUILD) PolySnapSandbox Android Development  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" $(ARGS)
 
-Construction-Android-Shipping:
-	 $(BUILD) Construction Android Shipping  -Project="/home/sander/dev/unreal/Construction/Construction.uproject" $(ARGS)
+PolySnapSandbox-Android-Shipping:
+	 $(BUILD) PolySnapSandbox Android Shipping  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" $(ARGS)
 
-Construction-Linux-DebugGame:
-	 $(BUILD) Construction Linux DebugGame  -Project="/home/sander/dev/unreal/Construction/Construction.uproject" $(ARGS)
+PolySnapSandbox-Linux-DebugGame:
+	 $(BUILD) PolySnapSandbox Linux DebugGame  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" $(ARGS)
 
-Construction-Linux-Development:
-	 $(BUILD) Construction Linux Development  -Project="/home/sander/dev/unreal/Construction/Construction.uproject" $(ARGS)
+PolySnapSandbox-Linux-Development:
+	 $(BUILD) PolySnapSandbox Linux Development  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" $(ARGS)
 
-Construction-Linux-Shipping:
-	 $(BUILD) Construction Linux Shipping  -Project="/home/sander/dev/unreal/Construction/Construction.uproject" $(ARGS)
+PolySnapSandbox-Linux-Shipping:
+	 $(BUILD) PolySnapSandbox Linux Shipping  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" $(ARGS)
 
-Construction-LinuxArm64-DebugGame:
-	 $(BUILD) Construction LinuxArm64 DebugGame  -Project="/home/sander/dev/unreal/Construction/Construction.uproject" $(ARGS)
+PolySnapSandbox-LinuxArm64-DebugGame:
+	 $(BUILD) PolySnapSandbox LinuxArm64 DebugGame  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" $(ARGS)
 
-Construction-LinuxArm64-Development:
-	 $(BUILD) Construction LinuxArm64 Development  -Project="/home/sander/dev/unreal/Construction/Construction.uproject" $(ARGS)
+PolySnapSandbox-LinuxArm64-Development:
+	 $(BUILD) PolySnapSandbox LinuxArm64 Development  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" $(ARGS)
 
-Construction-LinuxArm64-Shipping:
-	 $(BUILD) Construction LinuxArm64 Shipping  -Project="/home/sander/dev/unreal/Construction/Construction.uproject" $(ARGS)
+PolySnapSandbox-LinuxArm64-Shipping:
+	 $(BUILD) PolySnapSandbox LinuxArm64 Shipping  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" $(ARGS)
 
-Construction: Construction-Linux-Development
+PolySnapSandbox: PolySnapSandbox-Linux-Development
 
-ConstructionEditor-Linux-DebugGame:
-	 $(BUILD) ConstructionEditor Linux DebugGame  -Project="/home/sander/dev/unreal/Construction/Construction.uproject" $(ARGS)
+PolySnapSandboxEditor-Linux-DebugGame:
+	 $(BUILD) PolySnapSandboxEditor Linux DebugGame  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" $(ARGS)
 
-ConstructionEditor-Linux-Development:
-	 $(BUILD) ConstructionEditor Linux Development  -Project="/home/sander/dev/unreal/Construction/Construction.uproject" $(ARGS)
+PolySnapSandboxEditor-Linux-Development:
+	 $(BUILD) PolySnapSandboxEditor Linux Development  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" $(ARGS)
 
-ConstructionEditor: ConstructionEditor-Linux-Development
+PolySnapSandboxEditor: PolySnapSandboxEditor-Linux-Development
 
 ChaosTestHarness: ChaosTestHarness-Linux-Development
 
@@ -141,6 +141,6 @@ UnrealGame-LinuxArm64-Shipping:
 UnrealGame: UnrealGame-Linux-Development
 
 configure:
-	$(BUILD) -ProjectFiles -Project="/home/sander/dev/unreal/Construction/Construction.uproject" -Game 
+	$(BUILD) -ProjectFiles -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" -Game 
 
 .PHONY: $(TARGETS)

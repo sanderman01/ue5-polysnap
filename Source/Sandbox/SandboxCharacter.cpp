@@ -1,8 +1,7 @@
 // Copyright (c) 2026, Alexander Verbeek. All rights reserved.
 
-#include "ConstructionCharacter.h"
+#include "SandboxCharacter.h"
 
-#include "Construction.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedActionKeyMapping.h"
 #include "EnhancedInputComponent.h"
@@ -14,13 +13,14 @@
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
+#include "Sandbox.h"
 
-AConstructionCharacter::AConstructionCharacter()
+ASandboxCharacter::ASandboxCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
 }
 
-void AConstructionCharacter::BeginPlay()
+void ASandboxCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -30,12 +30,12 @@ void AConstructionCharacter::BeginPlay()
 	}
 }
 
-void AConstructionCharacter::EnterDebugFlight()
+void ASandboxCharacter::EnterDebugFlight()
 {
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (!IsValid(Movement))
 	{
-		UE_LOG(LogConstruction, Warning,
+		UE_LOG(LogSandbox, Warning,
 			TEXT("%s has no character movement component; debug flight unavailable."), *GetName());
 		return;
 	}
@@ -58,11 +58,11 @@ void AConstructionCharacter::EnterDebugFlight()
 	Movement->bUseSeparateBrakingFriction = true;
 	Movement->BrakingFriction = 4.0f;
 
-	UE_LOG(LogConstruction, Log,
+	UE_LOG(LogSandbox, Log,
 		TEXT("Debug flight enabled on %s (%.0f cm/s, boost %.0f cm/s)."), *GetName(), FlySpeed, BoostedFlySpeed);
 }
 
-void AConstructionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+void ASandboxCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
@@ -74,19 +74,16 @@ void AConstructionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent);
 	if (!EnhancedInput)
 	{
-		UE_LOG(LogConstruction, Warning,
+		UE_LOG(LogSandbox, Warning,
 			TEXT("%s expected an enhanced input component; debug flight keys will not be bound."), *GetName());
 		return;
 	}
 
 	BuildFlightInputMappings();
 
-	EnhancedInput->BindAction(FlyVerticalAction, ETriggerEvent::Triggered, this,
-		&AConstructionCharacter::HandleFlyVertical);
-	EnhancedInput->BindAction(FlyBoostAction, ETriggerEvent::Started, this,
-		&AConstructionCharacter::HandleBoostStarted);
-	EnhancedInput->BindAction(FlyBoostAction, ETriggerEvent::Completed, this,
-		&AConstructionCharacter::HandleBoostCompleted);
+	EnhancedInput->BindAction(FlyVerticalAction, ETriggerEvent::Triggered, this, &ASandboxCharacter::HandleFlyVertical);
+	EnhancedInput->BindAction(FlyBoostAction, ETriggerEvent::Started, this, &ASandboxCharacter::HandleBoostStarted);
+	EnhancedInput->BindAction(FlyBoostAction, ETriggerEvent::Completed, this, &ASandboxCharacter::HandleBoostCompleted);
 
 	const APlayerController* PlayerController = Cast<APlayerController>(GetController());
 	if (!PlayerController)
@@ -101,7 +98,7 @@ void AConstructionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	}
 }
 
-void AConstructionCharacter::BuildFlightInputMappings()
+void ASandboxCharacter::BuildFlightInputMappings()
 {
 	if (IsValid(FlightMappingContext))
 	{
@@ -124,24 +121,24 @@ void AConstructionCharacter::BuildFlightInputMappings()
 	FlightMappingContext->MapKey(FlyBoostAction, EKeys::LeftShift);
 }
 
-void AConstructionCharacter::HandleFlyVertical(const FInputActionValue& Value)
+void ASandboxCharacter::HandleFlyVertical(const FInputActionValue& Value)
 {
 	// World up, not actor up: vertical stays vertical however far the camera is pitched, which is
 	// what makes it usable for lining panels up.
 	AddMovementInput(FVector::UpVector, Value.Get<float>());
 }
 
-void AConstructionCharacter::HandleBoostStarted()
+void ASandboxCharacter::HandleBoostStarted()
 {
 	ApplyFlySpeed(BoostedFlySpeed);
 }
 
-void AConstructionCharacter::HandleBoostCompleted()
+void ASandboxCharacter::HandleBoostCompleted()
 {
 	ApplyFlySpeed(FlySpeed);
 }
 
-void AConstructionCharacter::ApplyFlySpeed(const float NewFlySpeed)
+void ASandboxCharacter::ApplyFlySpeed(const float NewFlySpeed)
 {
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement(); IsValid(Movement))
 	{

@@ -5,5 +5,5 @@
 #include "CoreMinimal.h"
 #include "Logging/LogMacros.h"
 
-/** Log category for the Construction game module. */
-DECLARE_LOG_CATEGORY_EXTERN(LogConstruction, Log, All);
+/** Log category for the Sandbox game module. */
+DECLARE_LOG_CATEGORY_EXTERN(LogSandbox, Log, All);

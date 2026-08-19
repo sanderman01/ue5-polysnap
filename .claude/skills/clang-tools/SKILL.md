@@ -23,7 +23,7 @@ Needs clang-format **21+** and clang-tidy **19+**. Override with `CLANG_FORMAT=`
 Tools/format.sh            # rewrite everything under Source/ and Plugins/
 Tools/format.sh --check    # report unformatted files, exit 1 — use this in review
 Tools/format.sh --staged   # only the lines staged in git
-Tools/format.sh Source/Construction/Foo.cpp
+Tools/format.sh Source/Sandbox/Foo.cpp
 ```
 
 **Never run clang-format over `Engine/`, `Intermediate/`, or `Content/`.** The scripts already
@@ -61,7 +61,7 @@ Both databases share the `.rsp` files under `Intermediate/Build`, so whichever t
 last wins. That is why `tidy.sh` regenerates by default — `--reuse-db` is the opt-out, not the norm.
 
 Regenerating never invokes the compiler or linker, so it is safe with the editor open. It does
-rewrite the `.rsp` files UBT uses for real builds, so the next `make ConstructionEditor`
+rewrite the `.rsp` files UBT uses for real builds, so the next `make PolySnapSandboxEditor`
 recompiles the module once because the command line changed.
 
 ## Editing the check list

@@ -1,4 +1,4 @@
-# clang-tidy for Construction — see CODE_STYLE.md and the `clang-tools` skill.
+# clang-tidy for PolySnapSandbox — see CODE_STYLE.md and the `clang-tools` skill.
 #
 # Requires clang-tidy 19+ (ExcludeHeaderFilterRegex). Run it through Tools/tidy.sh, which
 # builds the PCH-free compile database clang-tidy needs; a bare `clang-tidy` invocation

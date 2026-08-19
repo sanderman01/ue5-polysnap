@@ -3,7 +3,7 @@ name: automation-tests
 description: Decide whether a change should get an automated test at all, and if so write and run it as an Unreal Automation Spec. Use before writing any test in this project, when asked to add test coverage, or when deciding how to verify a change — most of this project is verified by the user playing the level, and only pure algorithmic code is tested in code.
 ---
 
-# Testing Construction
+# Testing PolySnapSandbox
 
 ## What gets a test
 
@@ -24,15 +24,15 @@ call it from a free function without spawning anything.
 ## Where tests live
 
 In the plugin's own `Tests/` folder, in a **module that is not shipped with the runtime
-target** — so the test module is listed in `ConstructionEditor.Target.cs`'s build graph via the
-plugin, never pulled into `Construction.Target.cs`.
+target** — so the test module is listed in `PolySnapSandboxEditor.Target.cs`'s build graph via the
+plugin, never pulled into `PolySnapSandbox.Target.cs`.
 
 A plugin's test module goes in its `.uplugin` with a type that keeps it out of shipping
 (`"Type": "Editor"` or `"DeveloperTool"`) and `"LoadingPhase": "Default"`. The module's
 `.Build.cs` depends on the plugin's runtime module plus the engine's automation support.
 
 The rule from CLAUDE.md still binds: a plugin's tests may not reference anything in
-`Source/Construction`. If a test only passes because the game module exists, that is a bug in
+`Source/Sandbox`. If a test only passes because the game module exists, that is a bug in
 the plugin.
 
 ## Writing one
@@ -56,7 +56,7 @@ Headless, from the project root:
 
 ```sh
 /home/sander/UnrealEngine_5_8_1/Engine/Binaries/Linux/UnrealEditor-Cmd \
-  "$PWD/Construction.uproject" \
+  "$PWD/PolySnapSandbox.uproject" \
   -ExecCmds="Automation RunTests <SpecPrefix>; Quit" \
   -unattended -nopause -nosplash -nullrhi -log
 ```

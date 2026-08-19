@@ -4,7 +4,7 @@ Companion to [README.md](README.md) and [CONVENTIONS.md](CONVENTIONS.md). The RE
 *what* we are building; CONVENTIONS.md pins down the asset-pipeline conventions shared between
 Blender and Unreal; this file governs the C++ we write.
 
-Applies to every module in the project — plugins and the `Construction` game module alike.
+Applies to every module in the project — plugins and the `Sandbox` game module alike.
 
 ---
 

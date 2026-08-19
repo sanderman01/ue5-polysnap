@@ -3,14 +3,14 @@
 using UnrealBuildTool;
 using System.Collections.Generic;
 
-public class ConstructionTarget : TargetRules
+public class PolySnapSandboxTarget : TargetRules
 {
-	public ConstructionTarget(TargetInfo Target) : base(Target)
+	public PolySnapSandboxTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Game;
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
 
-		ExtraModuleNames.AddRange( new string[] { "Construction" } );
+		ExtraModuleNames.AddRange( new string[] { "Sandbox" } );
 	}
 }

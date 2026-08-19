@@ -1,4 +1,4 @@
-# clang-format for Construction — Epic's coding standard.
+# clang-format for PolySnapSandbox — Epic's coding standard.
 #
 # See CODE_STYLE.md. Derived from the .clang-format files Epic ships inside the engine
 # (Engine/Source/Runtime/AutoRTFM, .../CorePreciseFP), adjusted to the engine-wide style

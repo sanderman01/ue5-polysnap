@@ -5,7 +5,7 @@
 	"Description": "",
 	"Modules": [
 		{
-			"Name": "Construction",
+			"Name": "Sandbox",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
 		}

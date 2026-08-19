@@ -1,4 +1,4 @@
-# Construction — Project Guide
+# PolySnapSandbox — Project Guide
 
 Supplements `~/AGENTS.md`. This file covers only what is specific to this project.
 Where the two overlap, this file wins.
@@ -23,26 +23,26 @@ UE5 C++, so favour the idiomatic engine solution over the clever one, and explai
 machinery when it is non-obvious.
 
 - Unreal Engine **5.8**, source build at `/home/sander/UnrealEngine_5_8_1`
-- Linux, single runtime module `Construction`, First Person template as the test bed
+- Linux, single runtime module `Sandbox`, First Person template as the test bed
 - Plugins enabled: `ModelingToolsEditorMode` (editor-only), `GameplayStateTree`
 
 ## Architecture rules
 
 **Ask before placing a new feature.** At the start of each new feature, ask whether it
-belongs in a new plugin, an existing plugin, or the `Construction` game module. Do not
+belongs in a new plugin, an existing plugin, or the `Sandbox` game module. Do not
 assume.
 
 **Plugins have zero dependencies on the game module — hard rule.**
-- A plugin may never `#include` or otherwise reference anything from `Source/Construction`,
-  nor depend on Construction-specific content or config.
+- A plugin may never `#include` or otherwise reference anything from `Source/Sandbox`,
+  nor depend on Sandbox-specific content or config.
 - Everything a plugin needs ships inside the plugin: its own `Content/`, its own settings
   (`UDeveloperSettings`), its own config.
 - Cross-plugin dependencies must be declared explicitly in `Build.cs` and justified in the
   commit message. Prefer no dependency at all.
-- The `Construction` game module is a thin harness: it glues plugins together and holds
+- The `Sandbox` game module is a thin harness: it glues plugins together and holds
   test-level scaffolding. Real logic does not live there.
 - Test each plugin as if the game module did not exist. If it only works because of
-  something in `Construction`, that is a bug.
+  something in `Sandbox`, that is a bug.
 
 **C++ for all logic; Blueprint for data and visuals only.** Blueprints configure assets,
 materials, and cosmetic wiring. No gameplay logic in Blueprint graphs. Every system is a
@@ -57,7 +57,7 @@ Use the **`unreal-build`** skill for anything that compiles, and the **`automati
 skill before writing a test. Two rules that must hold even if you never open them:
 
 - **Never kill the editor process.** A command-line build cannot overwrite a module `.so` the
-  running editor has loaded, so check `pgrep -af "[U]nrealEditor .*Construction.uproject"`
+  running editor has loaded, so check `pgrep -af "[U]nrealEditor .*PolySnapSandbox.uproject"`
   first and ask the user to close it.
 - **Automated tests are for pure/algorithmic code only.** Anything needing a world, actors, or
   rendering is verified by the user playing the level — do not write tests for it unless asked.

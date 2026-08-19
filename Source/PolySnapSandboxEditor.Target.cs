@@ -3,14 +3,14 @@
 using UnrealBuildTool;
 using System.Collections.Generic;
 
-public class ConstructionEditorTarget : TargetRules
+public class PolySnapSandboxEditorTarget : TargetRules
 {
-	public ConstructionEditorTarget(TargetInfo Target) : base(Target)
+	public PolySnapSandboxEditorTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
 
-		ExtraModuleNames.AddRange( new string[] { "Construction" } );
+		ExtraModuleNames.AddRange( new string[] { "Sandbox" } );
 	}
 }

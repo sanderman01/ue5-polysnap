@@ -1,16 +1,16 @@
 ---
 name: unreal-build
-description: Compile the Construction editor or runtime target, and regenerate project files after a module or plugin changes. Use before reporting any C++ change as working, when a build fails and the UBT output needs reading, or after adding, removing, or renaming a module, plugin, or .Build.cs — and read the editor guard first, because a command-line build cannot overwrite a module .so the running editor has loaded.
+description: Compile the PolySnapSandbox editor or runtime target, and regenerate project files after a module or plugin changes. Use before reporting any C++ change as working, when a build fails and the UBT output needs reading, or after adding, removing, or renaming a module, plugin, or .Build.cs — and read the editor guard first, because a command-line build cannot overwrite a module .so the running editor has loaded.
 ---
 
-# Building Construction
+# Building PolySnapSandbox
 
 ## First: is the editor running?
 
 The editor is often open. **Before any command-line build:**
 
 ```sh
-pgrep -af "[U]nrealEditor .*Construction.uproject"
+pgrep -af "[U]nrealEditor .*PolySnapSandbox.uproject"
 ```
 
 The bracket around `U` stops the check from matching its own shell command line — without it
@@ -27,18 +27,18 @@ neither compiler nor linker and may run with the editor open.
 With the editor closed, from the project root:
 
 ```sh
-make ConstructionEditor          # ConstructionEditor-Linux-Development
+make PolySnapSandboxEditor          # PolySnapSandboxEditor-Linux-Development
 ```
 
 or directly:
 
 ```sh
 /home/sander/UnrealEngine_5_8_1/Engine/Build/BatchFiles/Linux/Build.sh \
-  ConstructionEditor Linux Development \
-  -Project="/home/sander/dev/unreal/Construction/Construction.uproject"
+  PolySnapSandboxEditor Linux Development \
+  -Project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject"
 ```
 
-`ConstructionEditor` is the target to build by default — it is a superset of the `Construction`
+`PolySnapSandboxEditor` is the target to build by default — it is a superset of the `PolySnapSandbox`
 runtime target and is what the editor loads.
 
 ## What counts as verified
@@ -58,7 +58,7 @@ Regenerate project files:
 
 ```sh
 /home/sander/UnrealEngine_5_8_1/Engine/Build/BatchFiles/Linux/GenerateProjectFiles.sh \
-  -project="/home/sander/dev/unreal/Construction/Construction.uproject" -game -engine
+  -project="/home/sander/dev/unreal/PolySnap/PolySnapSandbox.uproject" -game -engine
 ```
 
 Then regenerate the clang database too (`clangd-database` skill) — new translation units never

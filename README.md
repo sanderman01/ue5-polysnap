@@ -1,4 +1,4 @@
-# Construction
+# PolySnapSandbox
 
 A game about building pressurised structures in microgravity, in orbit — and, more
 immediately, a testbed for the reusable plugin modules that game will be built from.
@@ -699,7 +699,7 @@ require a rewrite:
 A simple Newtonian free-flying pawn — RCS-style translation and rotation, no gravity — is
 needed to exercise the system: approach a rack, grab a piece, manoeuvre it, snap it.
 
-This is **test scaffolding, not a product**. It lives in the `Construction` game module (or as
+This is **test scaffolding, not a product**. It lives in the `Sandbox` game module (or as
 a Blueprint in `Content/`), never in PolySnap.
 
 ---
@@ -746,10 +746,10 @@ PolySnap's (§2.2, §2.8).
 
 Restating CLAUDE.md's rule, because it is the point of this project:
 
-**PolySnap must have zero dependencies on the `Construction` game module.** No includes, no
+**PolySnap must have zero dependencies on the `Sandbox` game module.** No includes, no
 references to project content, no assumptions about the player pawn or game mode. The game
 module is a thin harness that wires the plugin into a test level. If PolySnap only works
-because of something in `Construction`, that is a bug, not a shortcut.
+because of something in `Sandbox`, that is a bug, not a shortcut.
 
 Where a new feature belongs — new plugin, existing plugin, or game module — is decided
 per feature, in conversation, not assumed.

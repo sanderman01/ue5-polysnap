@@ -21,7 +21,7 @@
 #     and clang-tidy uses its own matching resource directory.
 #
 # Regenerating the database rewrites the .rsp files under Intermediate/Build, which UBT
-# also uses for real builds; the next `make ConstructionEditor` rebuilds the module once
+# also uses for real builds; the next `make PolySnapSandboxEditor` rebuilds the module once
 # because the command line changed. It never touches a loaded module .so, so this is safe
 # with the editor open (unlike a build — see the `unreal-build` skill).
 
@@ -30,8 +30,8 @@ set -euo pipefail
 ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 cd "$ROOT"
 
-PROJECT=$ROOT/Construction.uproject
-TARGET=ConstructionEditor
+PROJECT=$ROOT/PolySnapSandbox.uproject
+TARGET=PolySnapSandboxEditor
 DB_DIR=$ROOT/Intermediate/ClangTidy
 
 CLANG_TIDY=${CLANG_TIDY:-clang-tidy}
