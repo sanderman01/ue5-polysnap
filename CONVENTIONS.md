@@ -77,7 +77,17 @@ the plain right-hand formula, so the identical socket computes as
 `Outward ^ Tangent == −Normal` there. Unreal code that needs Normal from the other two writes
 `Tangent ^ Outward`; code that reads `EAxis::Z` directly is unaffected.
 
-**Socket scale is always 1.** PolySnap reads rotation and translation only.
+**Socket scale is ignored.** PolySnap reads rotation and translation only, so a socket may
+carry any uniform scale and nothing downstream can tell. An empty enlarged to be easier to click
+is a legitimate asset; the scale is dropped where the transform is first read, in
+`FPolySnapGeometry::Canonicalise`. What is *not* allowed is a **non-uniform** or **mirrored**
+scale — there is no single scale to drop, and a mirror flips the handedness the triad below
+depends on. §6 checks for exactly that.
+
+Do not read this as licence to scale a *piece*. That rule is the opposite one and unchanged
+(README §2.2): a placed piece is never scaled, because a panel at 1.5× has edges that no longer
+match the size tokens naming them. A socket's scale describes nothing, so it can say nothing
+false; a piece's scale describes the edges, so it can.
 
 **Outward is the vector that sweeps as the dihedral changes**: at 180° (coplanar)
 `Outward_B == -Outward_A`, and folding rotates the two toward each other about the shared
@@ -178,7 +188,9 @@ frame turns the warning off (§6); nothing at runtime consults it.
   is the only way to eyeball a socket's orientation before export.
 - **Parent it to the mesh object** (`Ctrl+P` → Object, Keep Transform). Unreal only recognises
   sockets that are children of the mesh node in the FBX hierarchy.
-- Empty *display size* is cosmetic; empty **object scale must stay 1**.
+- Empty *display size* is cosmetic, and so is empty object scale — PolySnap discards it (§2).
+  **Keep it 1 anyway** as house style: it is one less thing to explain when reading the outliner,
+  and a non-uniform scale that crept in is an error. Only *uniform* scale is forgiven.
 - Place it at the **midpoint of the edge**.
 
 ### Naming
@@ -292,7 +304,7 @@ One hard check, and it is deliberately alone:
 
 | Check | Catches |
 | --- | --- |
-| The socket's rotation matrix is orthonormal with determinant +1, and socket scale ≈ 1 | A scaled, sheared, or mirrored empty. Read the **raw matrix**, not `GetUnitAxis` — that accessor goes through `TransformVectorNoScale`, so a check written on its output is orthonormal by construction and can never fail. |
+| The socket's axes are equal in length and right-handed (determinant > 0) | A non-uniformly scaled, mirrored, or degenerate empty. A *uniform* scale passes and is silent — it is discarded before anything reads the socket (§2). There is no shear check: an `FTransform` holds its rotation as a quaternion and a `UStaticMeshSocket` holds an `FRotator`, so neither can carry one, and a check for it would test nothing. Read the **raw matrix**, not `GetUnitAxis` — that accessor goes through `TransformVectorNoScale`, so a check written on its output is orthonormal by construction and can never fail. |
 
 Neither size field gets a row. `Thickness` never could: a socket transform carries a point and a
 basis, not a cross-section, so there is nothing to measure it against. `Length` no longer can

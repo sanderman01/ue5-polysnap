@@ -132,6 +132,25 @@ void FPolySnapSocketAxesSpec::Define()
 						TestEqual(MappingName(Axes), Canonical.GetLocation(), Raw.GetLocation(), 1.0e-6f);
 					}
 				});
+
+			It("drops the socket's scale without disturbing its frame",
+				[this]()
+				{
+					// The chokepoint every runtime socket transform passes through, and therefore
+					// where scale leaves the system. CONVENTIONS.md section 2: a socket may carry
+					// any uniform scale and nothing downstream may be able to tell.
+					const FTransform Unscaled(FRotator(-22.0, 51.0, 7.0), FVector(3.0, 91.0, -18.0));
+					const FTransform Scaled(FQuat(FRotator(-22.0, 51.0, 7.0)), FVector(3.0, 91.0, -18.0), FVector(4.0));
+
+					for (const FPolySnapSocketAxes& Axes : LegalMappings())
+					{
+						const FQuat Correction = FPolySnapGeometry::AxisCorrection(Axes);
+
+						TestTrue(MappingName(Axes),
+							FPolySnapGeometry::Canonicalise(Scaled, Correction)
+								.Equals(FPolySnapGeometry::Canonicalise(Unscaled, Correction), 1.0e-6));
+					}
+				});
 		});
 
 	Describe("a legal mapping",

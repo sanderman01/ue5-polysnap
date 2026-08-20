@@ -34,15 +34,51 @@ public:
 	[[nodiscard]] static FQuat AxisCorrection(const FPolySnapSocketAxes& Axes);
 
 	/**
-	 * A socket transform as read off a mesh, re-expressed canonically.
+	 * The same frame at unit scale: rotation and translation kept, scale dropped.
+	 *
+	 * A socket's scale carries no information -- it is a Blender empty's object scale, which says
+	 * nothing about the edge it marks -- and letting it reach the solver actively corrupts the
+	 * answer, so it is discarded rather than trusted. Built from the quaternion directly: it is
+	 * already exact, and a matrix round trip through the basis would only cost precision.
+	 */
+	[[nodiscard]] static FTransform WithoutScale(const FTransform& SocketTransform);
+
+	/**
+	 * Whether a frame is a rotation carrying at most a positive uniform scale.
+	 *
+	 * What the runtime is entitled to assume of an authored socket, and therefore what the
+	 * import-time validator checks. Any positive uniform scale passes, because WithoutScale
+	 * removes it before anything reads the frame. Non-uniform scale fails, having no single scale
+	 * to remove; a mirror and a degenerate frame fail because they break the right-handed
+	 * Outward/Tangent/Normal triad that every polarity test depends on.
+	 *
+	 * Shear is not on that list because an FTransform cannot carry one -- its rotation is a
+	 * quaternion -- and a UStaticMeshSocket, storing an FRotator and an FVector, cannot either.
+	 *
+	 * Reads the raw matrix, never GetUnitAxis. CONVENTIONS.md section 6: that accessor goes
+	 * through TransformVectorNoScale, so a check written on its output is orthonormal by
+	 * construction and can never fail.
+	 *
+	 * @param OutUniformScale The scale that was found, meaningful only when this returns true.
+	 * @param OutDeterminant  The raw determinant, for a diagnostic. Negative means mirrored.
+	 */
+	[[nodiscard]] static bool IsUniformlyScaledRotation(const FTransform& Transform, double& OutUniformScale,
+		double& OutDeterminant);
+
+	/**
+	 * A socket transform as read off a mesh, re-expressed canonically and stripped of scale.
 	 *
 	 * The socket does not move and does not turn; only which of its axes carries which role
 	 * changes. Pass the correction in rather than the axes: this runs once per socket per tick
 	 * for every piece near the player, and the correction is worth caching.
+	 *
+	 * This is the one chokepoint every runtime socket transform passes through, so it is where
+	 * scale leaves the system -- the socket's own and any stray component scale alike. Everything
+	 * downstream may take a socket transform to be unit-scaled.
 	 */
 	[[nodiscard]] static FTransform Canonicalise(const FTransform& RawSocketTransform, const FQuat& Correction);
 
-	/** Resolves a socket transform into its three named directions. Scale is ignored; it must be 1. */
+	/** Resolves a socket transform into its three named directions. Any scale is ignored. */
 	[[nodiscard]] static FPolySnapSocketBasis BasisFromTransform(const FTransform& SocketTransform);
 
 	/**
@@ -86,7 +122,11 @@ public:
 	 * the polarity and the dihedral -- which is also what lets a server re-derive it instead of
 	 * trusting a client transform.
 	 *
-	 * @param HeldSocketLocal  The held socket's transform relative to its piece.
+	 * The result is always unit-scaled: any scale on HeldSocketLocal is discarded rather than
+	 * inverted into the answer. A socket's scale was never applied to its own offset, so dividing
+	 * the offset by it would displace the piece as well as shrink it.
+	 *
+	 * @param HeldSocketLocal  The held socket's transform relative to its piece. Scale is ignored.
 	 * @param Anchor           The target socket's basis, in world space.
 	 * @param Polarity         Which way round the held piece ends up.
 	 * @param InDihedralDegrees The angle about the shared edge.

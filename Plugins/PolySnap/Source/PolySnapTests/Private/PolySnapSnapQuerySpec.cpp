@@ -199,6 +199,40 @@ void FPolySnapSnapQuerySpec::Define()
 					TestEqual("tangents collinear", FMath::Abs(Placed.Tangent | Anchor.Tangent), 1.0, 1.0e-4);
 				});
 
+			It("solves the same transform whatever scale the sockets carry",
+				[this, Tolerances]()
+				{
+					// MakeSocket builds WorldTransform directly, so this never passes through
+					// Canonicalise -- which is the point. It is an independent check that the
+					// solver itself is immune, for the case where scale re-enters from the piece
+					// side of GetRelativeTransform rather than off the mesh.
+					const FTransform PanelA = FTransform::Identity;
+					const FTransform PanelB(FRotator(0.0, 178.0, 0.0), FVector(2.0 * HalfPanelUu + 4.0, 2.0, 0.0));
+
+					const auto Scaled = [](const FTransform& Socket, double Scale)
+					{
+						return FTransform(Socket.GetRotation(), Socket.GetTranslation(), FVector(Scale));
+					};
+
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelB))};
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelA))};
+
+					const TArray<FPolySnapWorldSocket> ScaledHeld = {
+						MakeSocket(1, TEXT("2000"), Scaled(PrimarySocketAt(PanelB), 2.5))};
+					const TArray<FPolySnapWorldSocket> ScaledTargets = {
+						MakeSocket(1, TEXT("2000"), Scaled(PrimarySocketAt(PanelA), 0.4))};
+
+					const FPolySnapCandidate Plain = FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
+					const FPolySnapCandidate WithScale =
+						FPolySnapSnapQuery::FindBest(ScaledHeld, ScaledTargets, PanelB, Tolerances);
+
+					TestTrue("found a candidate", WithScale.IsSet());
+					TestTrue("same placement",
+						WithScale.SolvedPieceTransform.Equals(Plain.SolvedPieceTransform, 1.0e-4));
+					TestEqual("piece is unscaled", WithScale.SolvedPieceTransform.GetScale3D(), FVector::OneVector,
+						1.0e-4f);
+				});
+
 			It("prefers the nearer of two passing pairs",
 				[this, Tolerances]()
 				{

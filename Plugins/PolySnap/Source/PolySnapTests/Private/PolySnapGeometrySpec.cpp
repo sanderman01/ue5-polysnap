@@ -18,6 +18,19 @@ static FTransform PrimarySocketLocal()
 	return FTransform(FRotator::ZeroRotator, FVector(HalfPanelUu, 0.0, 0.0));
 }
 
+/**
+ * The same socket with a uniform scale on it -- a Blender empty enlarged so it is easier to click.
+ * The frame is identical; only the number PolySnap is meant to ignore differs. CONVENTIONS.md
+ * section 2.
+ *
+ * The offset matters as much as the scale here: a socket at the origin would hide the misposition
+ * half of a scale bug, because there would be no lever arm for an inverse to divide.
+ */
+static FTransform ScaledPrimarySocketLocal(double UniformScale)
+{
+	return FTransform(FQuat::Identity, FVector(HalfPanelUu, 0.0, 0.0), FVector(UniformScale));
+}
+
 END_DEFINE_SPEC(FPolySnapGeometrySpec)
 
 void FPolySnapGeometrySpec::Define()
@@ -205,6 +218,65 @@ void FPolySnapGeometrySpec::Define()
 					TestEqual("scale", Solved.GetScale3D(), FVector::OneVector, 1.0e-4f);
 				});
 
+			It("leaves the piece unscaled even when the held socket is scaled",
+				[this]()
+				{
+					// The inverse of a socket scaled by s carries 1/s, and the desired pose is
+					// unit-scaled, so an unguarded solve hands the piece a scale of 1/s.
+					const FTransform Solved = FPolySnapGeometry::SolvePieceTransform(ScaledPrimarySocketLocal(3.0),
+						FPolySnapGeometry::BasisFromTransform(FTransform(FRotator(0.0, 45.0, 0.0))),
+						EPolySnapPolarity::Aligned, 90.0);
+
+					TestEqual("scale", Solved.GetScale3D(), FVector::OneVector, 1.0e-4f);
+				});
+
+			It("places the piece identically whatever scale the held socket carries",
+				[this]()
+				{
+					// The load-bearing one. Scale on a socket must be inert, not merely divided
+					// back out of the scale channel: Inverse divides the translation by s as well,
+					// and s was never applied to the socket's own offset on the way in. A solver
+					// that only fixed the scale would still put the piece in the wrong place, and
+					// that shows up as a snap residual rather than as a visibly scaled piece.
+					const FPolySnapSocketBasis Anchor = FPolySnapGeometry::BasisFromTransform(
+						FTransform(FRotator(5.0, 61.0, -14.0), FVector(300.0, -120.0, 45.0)));
+
+					const FTransform Unscaled = FPolySnapGeometry::SolvePieceTransform(PrimarySocketLocal(), Anchor,
+						EPolySnapPolarity::Aligned, 138.19);
+					const FTransform Scaled = FPolySnapGeometry::SolvePieceTransform(ScaledPrimarySocketLocal(2.5),
+						Anchor, EPolySnapPolarity::Aligned, 138.19);
+
+					TestEqual("location", Scaled.GetLocation(), Unscaled.GetLocation(), 1.0e-4f);
+					TestTrue("rotation", Scaled.GetRotation().Equals(Unscaled.GetRotation(), 1.0e-4));
+					TestEqual("scale", Scaled.GetScale3D(), Unscaled.GetScale3D(), 1.0e-4f);
+				});
+
+			It("picks the same placement whatever scale the held socket carries",
+				[this]()
+				{
+					// SolveNearestPlacement reads the socket rotation out of a product with the
+					// piece transform, which is the other route a scale could take into the answer.
+					const FPolySnapSocketBasis Anchor = FPolySnapGeometry::BasisFromTransform(
+						FTransform(FRotator(5.0, 61.0, -14.0), FVector(300.0, -120.0, 45.0)));
+					const FTransform CurrentPiece(FRotator(20.0, -70.0, 35.0), FVector(280.0, -90.0, 60.0));
+
+					EPolySnapPolarity UnscaledPolarity = EPolySnapPolarity::Aligned;
+					double UnscaledDihedral = 0.0;
+					double UnscaledRotation = 0.0;
+					FPolySnapGeometry::SolveNearestPlacement(PrimarySocketLocal(), CurrentPiece, Anchor,
+						UnscaledPolarity, UnscaledDihedral, UnscaledRotation);
+
+					EPolySnapPolarity ScaledPolarity = EPolySnapPolarity::Aligned;
+					double ScaledDihedral = 0.0;
+					double ScaledRotation = 0.0;
+					FPolySnapGeometry::SolveNearestPlacement(ScaledPrimarySocketLocal(2.5), CurrentPiece, Anchor,
+						ScaledPolarity, ScaledDihedral, ScaledRotation);
+
+					TestTrue("polarity", ScaledPolarity == UnscaledPolarity);
+					TestEqual("dihedral", ScaledDihedral, UnscaledDihedral, 1.0e-4);
+					TestEqual("required rotation", ScaledRotation, UnscaledRotation, 1.0e-4);
+				});
+
 			It("reproduces the calibration seam from panel A's own socket",
 				[this]()
 				{
@@ -261,6 +333,157 @@ void FPolySnapGeometrySpec::Define()
 
 					TestTrue("chose flipped", Polarity == EPolySnapPolarity::Flipped);
 					TestEqual("dihedral", Dihedral, 200.0, 1.0e-3);
+				});
+		});
+
+	Describe("dropping scale",
+		[this]()
+		{
+			It("keeps the rotation and the translation",
+				[this]()
+				{
+					const FTransform Scaled(FQuat(FRotator(-22.0, 51.0, 7.0)), FVector(3.0, 91.0, -18.0), FVector(4.0));
+					const FTransform Stripped = FPolySnapGeometry::WithoutScale(Scaled);
+
+					TestEqual("location", Stripped.GetLocation(), Scaled.GetLocation(), 1.0e-6f);
+					TestTrue("rotation", Stripped.GetRotation().Equals(Scaled.GetRotation(), 1.0e-6));
+					TestEqual("scale", Stripped.GetScale3D(), FVector::OneVector, 1.0e-6f);
+				});
+
+			It("leaves the socket's named directions where they were",
+				[this]()
+				{
+					// BasisFromTransform reads unit axes, so this can only fail if WithoutScale
+					// disturbs the quaternion -- which is exactly what a matrix round trip would
+					// risk, and why it is built from the rotation directly.
+					const FTransform Scaled(FQuat(FRotator(-22.0, 51.0, 7.0)), FVector(3.0, 91.0, -18.0),
+						FVector(0.25));
+
+					const FPolySnapSocketBasis Before = FPolySnapGeometry::BasisFromTransform(Scaled);
+					const FPolySnapSocketBasis After =
+						FPolySnapGeometry::BasisFromTransform(FPolySnapGeometry::WithoutScale(Scaled));
+
+					TestEqual("outward", After.Outward, Before.Outward, 1.0e-6f);
+					TestEqual("tangent", After.Tangent, Before.Tangent, 1.0e-6f);
+					TestEqual("normal", After.Normal, Before.Normal, 1.0e-6f);
+				});
+		});
+
+	Describe("the frame a socket is allowed to have",
+		[this]()
+		{
+			It("accepts a plain rotation",
+				[this]()
+				{
+					double UniformScale = 0.0;
+					double Determinant = 0.0;
+
+					TestTrue("accepted", FPolySnapGeometry::IsUniformlyScaledRotation(
+											 FTransform(FRotator(15.0, 40.0, -25.0)), UniformScale, Determinant));
+					TestEqual("scale", UniformScale, 1.0, 1.0e-6);
+					TestEqual("determinant", Determinant, 1.0, 1.0e-6);
+				});
+
+			It("accepts any uniform scale, large or small",
+				[this]()
+				{
+					// The point of the change: an empty enlarged in Blender so it is easier to
+					// click is a legitimate asset. CONVENTIONS.md section 2.
+					for (const double Scale : {0.01, 0.25, 2.5, 100.0})
+					{
+						double UniformScale = 0.0;
+						double Determinant = 0.0;
+
+						const FTransform Socket(FQuat(FRotator(15.0, 40.0, -25.0)), FVector(7.0, -3.0, 1.0),
+							FVector(Scale));
+
+						TestTrue(FString::Printf(TEXT("accepted at %g"), Scale),
+							FPolySnapGeometry::IsUniformlyScaledRotation(Socket, UniformScale, Determinant));
+						TestEqual(FString::Printf(TEXT("scale at %g"), Scale), UniformScale, Scale, 1.0e-6);
+					}
+				});
+
+			It("rejects a non-uniform scale",
+				[this]()
+				{
+					double UniformScale = 0.0;
+					double Determinant = 0.0;
+
+					const FTransform Socket(FQuat(FRotator(15.0, 40.0, -25.0)), FVector::ZeroVector,
+						FVector(1.0, 2.0, 1.0));
+
+					TestFalse("rejected",
+						FPolySnapGeometry::IsUniformlyScaledRotation(Socket, UniformScale, Determinant));
+				});
+
+			It("rejects a mirrored frame",
+				[this]()
+				{
+					// A mirror survives BasisFromTransform unnoticed -- GetUnitAxis reads the
+					// quaternion and never sees the sign -- so this check is the only thing
+					// standing between a flipped empty and every polarity test running backwards.
+					double UniformScale = 0.0;
+					double Determinant = 0.0;
+
+					const FTransform Socket(FQuat(FRotator(15.0, 40.0, -25.0)), FVector::ZeroVector,
+						FVector(-1.0, 1.0, 1.0));
+
+					TestFalse("rejected",
+						FPolySnapGeometry::IsUniformlyScaledRotation(Socket, UniformScale, Determinant));
+					TestTrue("determinant is negative", Determinant < 0.0);
+				});
+
+			It("rejects a negative uniform scale",
+				[this]()
+				{
+					// Uniform, and still a mirror: negating all three axes flips the handedness
+					// just as one does. "Any uniform scale" means any POSITIVE uniform scale.
+					double UniformScale = 0.0;
+					double Determinant = 0.0;
+
+					const FTransform Socket(FQuat::Identity, FVector::ZeroVector, FVector(-2.0));
+
+					TestFalse("rejected",
+						FPolySnapGeometry::IsUniformlyScaledRotation(Socket, UniformScale, Determinant));
+				});
+
+			It("rejects a degenerate frame",
+				[this]()
+				{
+					double UniformScale = 0.0;
+					double Determinant = 0.0;
+
+					const FTransform Socket(FQuat::Identity, FVector::ZeroVector, FVector::ZeroVector);
+
+					TestFalse("rejected",
+						FPolySnapGeometry::IsUniformlyScaledRotation(Socket, UniformScale, Determinant));
+				});
+
+			It("reaches the same verdict at every scale",
+				[this]()
+				{
+					// The tolerance is applied to row lengths already divided by the frame's own
+					// scale, so "how non-uniform is this" means the same thing everywhere. An
+					// absolute tolerance would judge the identical asset differently depending on
+					// how big its empty happened to be -- a scale dependence inside the very check
+					// that exists to remove one. The deviation here is 2e-4 relative, twice the
+					// tolerance, so it must be rejected at 0.01x and at 100x alike.
+					const FQuat Rotation(FRotator(15.0, 40.0, -25.0));
+
+					for (const double Scale : {0.01, 1.0, 100.0})
+					{
+						double UniformScale = 0.0;
+						double Determinant = 0.0;
+
+						const FTransform Uniform(Rotation, FVector::ZeroVector, FVector(Scale));
+						TestTrue(FString::Printf(TEXT("uniform accepted at %g"), Scale),
+							FPolySnapGeometry::IsUniformlyScaledRotation(Uniform, UniformScale, Determinant));
+
+						const FTransform NearlyUniform(Rotation, FVector::ZeroVector,
+							FVector(Scale, Scale * 1.0002, Scale));
+						TestFalse(FString::Printf(TEXT("non-uniform rejected at %g"), Scale),
+							FPolySnapGeometry::IsUniformlyScaledRotation(NearlyUniform, UniformScale, Determinant));
+					}
 				});
 		});
 

@@ -13,38 +13,9 @@
 
 namespace PolySnapMeshValidationPrivate
 {
-/** How far from orthonormal a socket's rotation may be before it is called sheared. */
-constexpr double OrthonormalTolerance = 1.0e-4;
-
 [[nodiscard]] FTransform SocketTransform(const UStaticMeshSocket& Socket)
 {
 	return FTransform(Socket.RelativeRotation, Socket.RelativeLocation, Socket.RelativeScale);
-}
-
-/**
-	 * CONVENTIONS.md section 6 insists this reads the raw matrix. A check written on GetUnitAxis
-	 * output is orthonormal by construction -- that accessor goes through TransformVectorNoScale
-	 * -- and can never fail, so it would look like a check while testing nothing.
-	 */
-[[nodiscard]] bool IsRotationOrthonormal(const FTransform& Transform, double& OutDeterminant)
-{
-	const FMatrix Matrix = Transform.ToMatrixWithScale();
-
-	const FVector Row0(Matrix.M[0][0], Matrix.M[0][1], Matrix.M[0][2]);
-	const FVector Row1(Matrix.M[1][0], Matrix.M[1][1], Matrix.M[1][2]);
-	const FVector Row2(Matrix.M[2][0], Matrix.M[2][1], Matrix.M[2][2]);
-
-	OutDeterminant = Row0 | FVector::CrossProduct(Row1, Row2);
-
-	const bool bUnitLength = FMath::IsNearlyEqual(Row0.Size(), 1.0, OrthonormalTolerance)
-						  && FMath::IsNearlyEqual(Row1.Size(), 1.0, OrthonormalTolerance)
-						  && FMath::IsNearlyEqual(Row2.Size(), 1.0, OrthonormalTolerance);
-
-	const bool bPerpendicular = FMath::IsNearlyZero(Row0 | Row1, OrthonormalTolerance)
-							 && FMath::IsNearlyZero(Row1 | Row2, OrthonormalTolerance)
-							 && FMath::IsNearlyZero(Row0 | Row2, OrthonormalTolerance);
-
-	return bUnitLength && bPerpendicular && FMath::IsNearlyEqual(OutDeterminant, 1.0, OrthonormalTolerance);
 }
 
 [[nodiscard]] bool IsParallel(const FVector& A, const FVector& B, double ToleranceDegrees)
@@ -163,15 +134,22 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 		const FPolySnapSocketBasis Basis = FPolySnapGeometry::BasisFromTransform(Transform);
 
 		// -- Hard check 1: the socket's own frame ------------------------------------------
-		// On the raw transform, deliberately: the correction is a rotation, so it would carry a
-		// scale or a shear straight through, but reading what the asset actually stores is the
-		// point of this check and CONVENTIONS.md section 6 says so.
+		// On the raw transform, deliberately: Canonicalise strips the scale and would hide the
+		// very thing being checked, and reading what the asset actually stores is the point.
+		// CONVENTIONS.md section 6 says so.
+		//
+		// A uniform scale is not among the failures. It is discarded before anything reads the
+		// socket, so it means nothing and gets no diagnostic -- an empty enlarged in Blender to
+		// be easier to click is a legitimate asset.
+		double UniformScale = 0.0;
 		double Determinant = 0.0;
-		if (!IsRotationOrthonormal(RawTransform, Determinant))
+		if (!FPolySnapGeometry::IsUniformlyScaledRotation(RawTransform, UniformScale, Determinant))
 		{
 			OutReport.Add(EPolySnapValidationSeverity::Error,
-				FString::Printf(TEXT("Socket '%s' has a scaled, sheared or mirrored frame (scale %s, determinant %.6f). "
-						 "PolySnap reads rotation and translation only; socket scale must be 1."),
+				FString::Printf(TEXT("Socket '%s' has a non-uniformly scaled, mirrored or degenerate frame "
+						 "(scale %s, determinant %.6f). PolySnap reads rotation and translation only, so any "
+						 "uniform scale is fine, but the socket's axes must stay equal in length and "
+						 "right-handed."),
 					*SocketName, *Socket->RelativeScale.ToString(), Determinant));
 		}
 

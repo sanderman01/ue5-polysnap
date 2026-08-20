@@ -10,6 +10,13 @@ namespace PolySnapGeometryPrivate
 	 * any particular fold, so any dihedral is equally far away.
 	 */
 constexpr double TwistEpsilon = UE_DOUBLE_SMALL_NUMBER;
+
+/**
+	 * How far from a uniformly scaled rotation a socket's frame may be before it is called
+	 * non-uniform or mirrored. Applied to quantities already divided by the frame's own scale, so
+	 * it means the same thing at every scale -- see IsUniformlyScaledRotation.
+	 */
+constexpr double ConformalTolerance = 1.0e-4;
 }
 
 double FPolySnapGeometry::WrapDegrees(double Degrees)
@@ -40,6 +47,56 @@ FQuat FPolySnapGeometry::AxisCorrection(const FPolySnapSocketAxes& Axes)
 	return AxisMatrix.ToQuat();
 }
 
+FTransform FPolySnapGeometry::WithoutScale(const FTransform& SocketTransform)
+{
+	return FTransform(SocketTransform.GetRotation(), SocketTransform.GetTranslation());
+}
+
+bool FPolySnapGeometry::IsUniformlyScaledRotation(const FTransform& Transform, double& OutUniformScale,
+	double& OutDeterminant)
+{
+	using namespace PolySnapGeometryPrivate;
+
+	const FMatrix Matrix = Transform.ToMatrixWithScale();
+
+	const FVector Row0(Matrix.M[0][0], Matrix.M[0][1], Matrix.M[0][2]);
+	const FVector Row1(Matrix.M[1][0], Matrix.M[1][1], Matrix.M[1][2]);
+	const FVector Row2(Matrix.M[2][0], Matrix.M[2][1], Matrix.M[2][2]);
+
+	OutUniformScale = Row0.Size();
+	OutDeterminant = Row0 | FVector::CrossProduct(Row1, Row2);
+
+	// A frame with no length left has no axes to test, and every ratio below would divide by zero.
+	if (OutUniformScale <= UE_DOUBLE_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	// Every comparison is against a quantity divided by the scale it grows with: row lengths by
+	// s, the determinant by s cubed. Testing the raw values instead would make the tolerance mean
+	// something different at every scale -- silently strict on a 0.1x socket, silently loose on a
+	// 10x one -- which is the very dependence this check exists to remove.
+	const double InverseScale = 1.0 / OutUniformScale;
+
+	const bool bUniform = FMath::IsNearlyEqual(Row1.Size() * InverseScale, 1.0, ConformalTolerance)
+					   && FMath::IsNearlyEqual(Row2.Size() * InverseScale, 1.0, ConformalTolerance);
+
+	// There is deliberately no perpendicularity test. FTransform stores its rotation as an FQuat,
+	// so a shear has nowhere to live: whatever is fed in, the rows of ToMatrixWithScale come back
+	// as scaled axes of a genuine rotation and are perpendicular by construction. Nor could an
+	// authored socket be sheared in the first place -- UStaticMeshSocket stores an FRotator and an
+	// FVector. A dot-product check here would look like a check while testing nothing, the same
+	// trap CONVENTIONS.md section 6 warns about for GetUnitAxis.
+	//
+	// Plus one, not merely unit magnitude. A mirrored socket has determinant -1 and would still
+	// hand BasisFromTransform a usable-looking triad, because GetUnitAxis reads the quaternion and
+	// never sees the flip -- so this is the only place the handedness error can be caught at all.
+	const bool bRightHanded =
+		FMath::IsNearlyEqual(OutDeterminant * InverseScale * InverseScale * InverseScale, 1.0, ConformalTolerance);
+
+	return bUniform && bRightHanded;
+}
+
 FTransform FPolySnapGeometry::Canonicalise(const FTransform& RawSocketTransform, const FQuat& Correction)
 {
 	// FTransform(Correction) * RawSocketTransform, written out. The correction applies first, in
@@ -47,8 +104,13 @@ FTransform FPolySnapGeometry::Canonicalise(const FTransform& RawSocketTransform,
 	// to left where FTransform composes left to right, hence the order. Spelling it out keeps the
 	// location untouched by construction rather than by cancellation, and keeps a per-socket,
 	// per-tick call off FTransform's general multiply path.
-	return FTransform(RawSocketTransform.GetRotation() * Correction, RawSocketTransform.GetTranslation(),
-		RawSocketTransform.GetScale3D());
+	//
+	// Unit scale, deliberately. The raw transform arrives carrying the socket's own scale and its
+	// component's, and neither says anything about the edge -- so this is where both leave. Note
+	// that the correction is a rotation and would have carried a non-uniform scale through
+	// unrotated, quietly attaching it to the wrong axes; there is nothing to get wrong once the
+	// scale is gone.
+	return FTransform(RawSocketTransform.GetRotation() * Correction, RawSocketTransform.GetTranslation());
 }
 
 FPolySnapSocketBasis FPolySnapGeometry::BasisFromTransform(const FTransform& SocketTransform)
@@ -106,7 +168,14 @@ FTransform FPolySnapGeometry::SolvePieceTransform(const FTransform& HeldSocketLo
 	// SocketWorld == SocketLocal * PieceWorld, so the piece transform is what remains once the
 	// socket's own offset is divided out. FTransform composes left to right: A * B applies A
 	// first, which is the opposite order to FQuat.
-	return HeldSocketLocal.Inverse() * DesiredSocketWorld;
+	//
+	// Scale is dropped before inverting, not after. DesiredSocketWorld is unit-scaled by
+	// construction, so inverting a socket scaled by s would leave the piece scaled by 1/s AND
+	// displaced, because Inverse divides the translation by s as well -- an offset that s was
+	// never applied to on the way in. Canonicalise already strips scale on the runtime path;
+	// this repeats it because a caller building HeldSocketLocal from GetRelativeTransform can
+	// reintroduce scale from the piece side without passing through Canonicalise at all.
+	return WithoutScale(HeldSocketLocal).Inverse() * DesiredSocketWorld;
 }
 
 double FPolySnapGeometry::AngleBetweenDegrees(const FQuat& A, const FQuat& B)
@@ -121,7 +190,11 @@ double FPolySnapGeometry::NearestDihedralDegrees(const FTransform& HeldSocketLoc
 {
 	using namespace PolySnapGeometryPrivate;
 
-	const FQuat CurrentSocketRotation = (HeldSocketLocal * CurrentPieceTransform).GetRotation();
+	// (HeldSocketLocal * CurrentPieceTransform).GetRotation(), composed directly. FTransform's
+	// multiply sets Out.Rotation = B.Rotation * A.Rotation, so this is the same quaternion for an
+	// unscaled pair and an exact one for any other: a non-uniform scale pushes FTransform onto its
+	// matrix path, whose extracted rotation is a shear-contaminated approximation.
+	const FQuat CurrentSocketRotation = CurrentPieceTransform.GetRotation() * HeldSocketLocal.GetRotation();
 	const FQuat BaseRotation = TransformFromBasis(MatedBasis(Anchor, Polarity, 0.0)).GetRotation();
 
 	// The admissible poses are BaseRotation followed by a rotation about the world axis
