@@ -154,7 +154,7 @@ void UPolySnapBuilderComponent::SetupInput()
 		bInputBound = true;
 
 		UE_LOG(LogPolySnap, Log,
-			TEXT("PolySnap build keys bound on '%s': E grab/place, Q drop, Z/C roll, mouse wheel distance."),
+			TEXT("PolySnap build keys bound on '%s': F grab/place, G drop, Q/E roll, mouse wheel distance."),
 				*GetNameSafe(GetOwner()));
 	}
 }
@@ -179,11 +179,11 @@ void UPolySnapBuilderComponent::BuildInputMappings()
 	HoldDistanceAction->ValueType = EInputActionValueType::Axis1D;
 
 	BuildMappingContext = NewObject<UInputMappingContext>(this, TEXT("IMC_PolySnapBuild"));
-	BuildMappingContext->MapKey(GrabAction, EKeys::E);
-	BuildMappingContext->MapKey(DropAction, EKeys::Q);
+	BuildMappingContext->MapKey(GrabAction, EKeys::F);
+	BuildMappingContext->MapKey(DropAction, EKeys::G);
 
-	BuildMappingContext->MapKey(RollAction, EKeys::C);
-	FEnhancedActionKeyMapping& RollLeft = BuildMappingContext->MapKey(RollAction, EKeys::Z);
+	BuildMappingContext->MapKey(RollAction, EKeys::E);
+	FEnhancedActionKeyMapping& RollLeft = BuildMappingContext->MapKey(RollAction, EKeys::Q);
 	RollLeft.Modifiers.Add(NewObject<UInputModifierNegate>(BuildMappingContext));
 
 	// One notch of the wheel is +-1 on this axis, which the handler scales by the step size.
@@ -537,9 +537,9 @@ void UPolySnapBuilderComponent::DrawDebug() const
 	}
 
 	GEngine->AddOnScreenDebugMessage(ReadoutKeyHeld, 0.0f, FColor::White,
-		HeldPiece != nullptr ? FString::Printf(TEXT("PolySnap: holding %s  (E place, Q drop, Z/C roll, wheel %.0f cm)"),
+		HeldPiece != nullptr ? FString::Printf(TEXT("PolySnap: holding %s  (F place, G drop, Q/E roll, wheel %.0f cm)"),
 								   *GetNameSafe(HeldPiece->GetOwner()), HoldDistanceUu)
-							 : FString(TEXT("PolySnap: nothing held  (E to grab)")));
+							 : FString(TEXT("PolySnap: nothing held  (F to grab)")));
 
 	if (CurrentCandidate.IsSet())
 	{
