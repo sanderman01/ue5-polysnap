@@ -54,41 +54,42 @@ void SetError(FString* OutError, FStringView SocketName, const FString& Reason)
 }
 
 /**
-	 * Reads one millimetre token: a bare positive integer, never zero-padded.
+	 * Reads one size token: a non-empty run of letters and digits, stored verbatim.
+	 *
+	 * The token carries no unit and is never read as a number. "40", "40mm", "4cm" and "Thin" are
+	 * equally legal, because the only thing done with the value is compare it for equality against
+	 * the matching field on another socket (README section 2.2). A project chooses a vocabulary;
+	 * PolySnap only insists that both ends of a joint spell it the same way.
+	 *
+	 * Letters and digits only is what keeps the structural diagnostics sharp. It is the rule that
+	 * catches a name still carrying its authoring-tail '.' after import, which would otherwise
+	 * disappear into a token nobody meant to write.
 	 *
 	 * Thickness and Length have identical rules, so they share this. FieldName is what puts the
 	 * right word in the diagnostic -- with two size fields in the grammar, "size" no longer says
 	 * which of them the author mistyped.
-	 *
-	 * Unpadded is a rule rather than a tolerance: one size, one spelling, so that 500 and 12000
-	 * can coexist without a fixed width inviting a four-digit assumption.
 	 */
-[[nodiscard]] bool ParseMillimetreToken(FStringView Token, const TCHAR* FieldName, FStringView SocketName,
-	int32& OutValue, FString* OutError)
+[[nodiscard]] bool ParseSizeToken(FStringView Token, const TCHAR* FieldName, FStringView SocketName, FName& OutValue,
+	FString* OutError)
 {
-	if (!IsAllDigits(Token))
+	if (Token.IsEmpty())
 	{
-		SetError(OutError, SocketName,
-			FString::Printf(TEXT("%s '%.*s' must be a bare integer in millimetres"), FieldName, Token.Len(),
-				Token.GetData()));
+		SetError(OutError, SocketName, FString::Printf(TEXT("%s is empty"), FieldName));
 		return false;
 	}
 
-	if (Token.Len() > 1 && Token[0] == TEXT('0'))
+	for (const TCHAR Character : Token)
 	{
-		SetError(OutError, SocketName,
-			FString::Printf(TEXT("%s '%.*s' is zero-padded; write 500, never 0500"), FieldName, Token.Len(),
-				Token.GetData()));
-		return false;
+		if (!FChar::IsAlnum(Character))
+		{
+			SetError(OutError, SocketName,
+				FString::Printf(TEXT("%s '%.*s' must be letters and digits only"), FieldName, Token.Len(),
+					Token.GetData()));
+			return false;
+		}
 	}
 
-	OutValue = ToInt(Token);
-	if (OutValue <= 0)
-	{
-		SetError(OutError, SocketName, FString::Printf(TEXT("%s must be greater than zero"), FieldName));
-		return false;
-	}
-
+	OutValue = FName(Token.Len(), Token.GetData());
 	return true;
 }
 } // namespace PolySnapSocketNamePrivate
@@ -225,8 +226,8 @@ EPolySnapParseResult FPolySnapSocketName::Parse(FStringView SocketName, FPolySna
 		return EPolySnapParseResult::Malformed;
 	}
 
-	// Both size fields are millimetre tokens on identical terms, so they share one reader, and they
-	// are read in the order they are written. Thickness is the panel across the edge; Length is the
+	// Both size fields are opaque tokens on identical terms, so they share one reader, and they are
+	// read in the order they are written. Thickness is the panel across the edge; Length is the
 	// edge itself, and the pair is what makes two edges of equal length but unequal thickness -- a
 	// stepped seam -- incompatible rather than merely ugly.
 	//
@@ -234,14 +235,14 @@ EPolySnapParseResult FPolySnapSocketName::Parse(FStringView SocketName, FPolySna
 	// parameter, and a curved subtype would replace it with two of its own; keeping the
 	// subtype-specific parameters last is what lets that happen without moving anything ahead of
 	// them.
-	int32 ThicknessMillimetres = 0;
-	if (!ParseMillimetreToken(ThicknessToken, TEXT("thickness"), SocketName, ThicknessMillimetres, OutError))
+	FName Thickness;
+	if (!ParseSizeToken(ThicknessToken, TEXT("thickness"), SocketName, Thickness, OutError))
 	{
 		return EPolySnapParseResult::Malformed;
 	}
 
-	int32 LengthMillimetres = 0;
-	if (!ParseMillimetreToken(LengthToken, TEXT("length"), SocketName, LengthMillimetres, OutError))
+	FName Length;
+	if (!ParseSizeToken(LengthToken, TEXT("length"), SocketName, Length, OutError))
 	{
 		return EPolySnapParseResult::Malformed;
 	}
@@ -249,8 +250,8 @@ EPolySnapParseResult FPolySnapSocketName::Parse(FStringView SocketName, FPolySna
 	OutDescriptor.SocketName = FName(SocketName);
 	OutDescriptor.Id = Id;
 	OutDescriptor.SubType = SubType;
-	OutDescriptor.ThicknessMillimetres = ThicknessMillimetres;
-	OutDescriptor.LengthMillimetres = LengthMillimetres;
+	OutDescriptor.Thickness = Thickness;
+	OutDescriptor.Length = Length;
 
 	return EPolySnapParseResult::Parsed;
 }

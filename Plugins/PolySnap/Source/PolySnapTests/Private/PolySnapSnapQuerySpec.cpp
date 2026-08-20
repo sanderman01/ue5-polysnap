@@ -10,29 +10,30 @@
 BEGIN_DEFINE_SPEC(FPolySnapSnapQuerySpec, "PolySnap.SnapQuery",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-/** Half of the calibration panel's 2000 mm edge, in Unreal units. */
+/** Half of the calibration panel's edge, in Unreal units. */
 static constexpr double HalfPanelUu = 100.0;
 
-/** The calibration panel's thickness, in millimetres. Only the tests about it pass anything else. */
-static constexpr int32 PanelThicknessMm = 40;
+/** The calibration panel's thickness token. Only the tests about it pass anything else. */
+static constexpr const TCHAR* PanelThickness = TEXT("40");
 
 /**
  * A world socket with no piece behind it, which is all the pure query needs.
  *
- * Thickness is defaulted because almost every test here is about geometry rather than
+ * The size fields are tokens rather than numbers, so they are spelled as text here; these ones
+ * happen to read as millimetres because the calibration panel does, but the query never knows
+ * that. Thickness is defaulted because almost every test here is about geometry rather than
  * compatibility, and spelling the same 40 at every call site would bury the two cases that
  * actually vary it.
  */
-static FPolySnapWorldSocket MakeSocket(int32 Id, int32 LengthMillimetres, const FTransform& WorldTransform,
-	int32 ThicknessMillimetres = PanelThicknessMm)
+static FPolySnapWorldSocket MakeSocket(int32 Id, const TCHAR* Length, const FTransform& WorldTransform,
+	const TCHAR* Thickness = PanelThickness)
 {
 	FPolySnapWorldSocket Socket;
-	Socket.Descriptor.SocketName =
-		FName(*FString::Printf(TEXT("Edge_%03d_Straight_%d_%d"), Id, ThicknessMillimetres, LengthMillimetres));
+	Socket.Descriptor.SocketName = FName(*FString::Printf(TEXT("Edge_%03d_Straight_%s_%s"), Id, Thickness, Length));
 	Socket.Descriptor.Id = Id;
 	Socket.Descriptor.SubType = EPolySnapEdgeSubType::Straight;
-	Socket.Descriptor.ThicknessMillimetres = ThicknessMillimetres;
-	Socket.Descriptor.LengthMillimetres = LengthMillimetres;
+	Socket.Descriptor.Thickness = FName(Thickness);
+	Socket.Descriptor.Length = FName(Length);
 	Socket.WorldTransform = WorldTransform;
 
 	return Socket;
@@ -63,8 +64,8 @@ void FPolySnapSnapQuerySpec::Define()
 				{
 					// Cheap integer comparison, so it goes first. Two sockets in exactly the same place
 					// still do not mate if their lengths differ.
-					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity);
-					const FPolySnapWorldSocket Target = MakeSocket(1, 3464, FTransform::Identity);
+					const FPolySnapWorldSocket Held = MakeSocket(1, TEXT("2000"), FTransform::Identity);
+					const FPolySnapWorldSocket Target = MakeSocket(1, TEXT("3464"), FTransform::Identity);
 
 					FPolySnapCandidate Candidate;
 					TestEqual("reason",
@@ -79,8 +80,8 @@ void FPolySnapSnapQuerySpec::Define()
 					// would mate happily, and the seam it produces is stepped rather than flush. The
 					// thickness token is the only thing that knows, since no socket transform carries
 					// a cross-section.
-					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity, 40);
-					const FPolySnapWorldSocket Target = MakeSocket(1, 2000, FTransform::Identity, 100);
+					const FPolySnapWorldSocket Held = MakeSocket(1, TEXT("2000"), FTransform::Identity, TEXT("40"));
+					const FPolySnapWorldSocket Target = MakeSocket(1, TEXT("2000"), FTransform::Identity, TEXT("100"));
 
 					FPolySnapCandidate Candidate;
 					TestEqual("reason",
@@ -91,9 +92,9 @@ void FPolySnapSnapQuerySpec::Define()
 			It("rejects a pair further apart than the snap distance",
 				[this, Tolerances]()
 				{
-					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity);
+					const FPolySnapWorldSocket Held = MakeSocket(1, TEXT("2000"), FTransform::Identity);
 					const FPolySnapWorldSocket Target =
-						MakeSocket(1, 2000, FTransform(FRotator(0.0, 180.0, 0.0), FVector(500.0, 0.0, 0.0)));
+						MakeSocket(1, TEXT("2000"), FTransform(FRotator(0.0, 180.0, 0.0), FVector(500.0, 0.0, 0.0)));
 
 					FPolySnapCandidate Candidate;
 					TestEqual("reason",
@@ -104,8 +105,9 @@ void FPolySnapSnapQuerySpec::Define()
 			It("rejects a pair whose edges are not collinear",
 				[this, Tolerances]()
 				{
-					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity);
-					const FPolySnapWorldSocket Target = MakeSocket(1, 2000, FTransform(FRotator(0.0, 90.0, 0.0)));
+					const FPolySnapWorldSocket Held = MakeSocket(1, TEXT("2000"), FTransform::Identity);
+					const FPolySnapWorldSocket Target =
+						MakeSocket(1, TEXT("2000"), FTransform(FRotator(0.0, 90.0, 0.0)));
 
 					FPolySnapCandidate Candidate;
 					TestEqual("reason",
@@ -117,17 +119,19 @@ void FPolySnapSnapQuerySpec::Define()
 			It("accepts either tangent polarity, because both are admissible",
 				[this, Tolerances]()
 				{
-					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity);
+					const FPolySnapWorldSocket Held = MakeSocket(1, TEXT("2000"), FTransform::Identity);
 
 					// Opposed tangents.
-					const FPolySnapWorldSocket Aligned = MakeSocket(1, 2000, FTransform(FRotator(0.0, 180.0, 0.0)));
+					const FPolySnapWorldSocket Aligned =
+						MakeSocket(1, TEXT("2000"), FTransform(FRotator(0.0, 180.0, 0.0)));
 					FPolySnapCandidate AlignedCandidate;
 					TestEqual("aligned",
 						RejectionName(FPolySnapSnapQuery::TestPair(Held, Aligned, Tolerances, AlignedCandidate)),
 						RejectionName(EPolySnapRejection::None));
 
 					// Same tangent: the piece is turned over, which is a motion the player can perform.
-					const FPolySnapWorldSocket Flipped = MakeSocket(1, 2000, FTransform(FRotator(0.0, 0.0, 180.0)));
+					const FPolySnapWorldSocket Flipped =
+						MakeSocket(1, TEXT("2000"), FTransform(FRotator(0.0, 0.0, 180.0)));
 					FPolySnapCandidate FlippedCandidate;
 					TestEqual("flipped",
 						RejectionName(FPolySnapSnapQuery::TestPair(Held, Flipped, Tolerances, FlippedCandidate)),
@@ -139,9 +143,9 @@ void FPolySnapSnapQuerySpec::Define()
 				{
 					// The measurements are what the debug readout shows while the player closes in, so
 					// they have to be filled in on the way to a rejection, not only on success.
-					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity);
+					const FPolySnapWorldSocket Held = MakeSocket(1, TEXT("2000"), FTransform::Identity);
 					const FPolySnapWorldSocket Target =
-						MakeSocket(1, 2000, FTransform(FRotator(0.0, 180.0, 0.0), FVector(60.0, 0.0, 0.0)));
+						MakeSocket(1, TEXT("2000"), FTransform(FRotator(0.0, 180.0, 0.0), FVector(60.0, 0.0, 0.0)));
 
 					FPolySnapCandidate Candidate;
 					TestEqual("reason",
@@ -159,9 +163,9 @@ void FPolySnapSnapQuerySpec::Define()
 			It("returns nothing when no pair is in tolerance",
 				[this, Tolerances]()
 				{
-					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, 2000, FTransform::Identity)};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, TEXT("2000"), FTransform::Identity)};
 					const TArray<FPolySnapWorldSocket> Targets = {
-						MakeSocket(1, 2000, FTransform(FRotator::ZeroRotator, FVector(900.0, 0.0, 0.0)))};
+						MakeSocket(1, TEXT("2000"), FTransform(FRotator::ZeroRotator, FVector(900.0, 0.0, 0.0)))};
 
 					const FPolySnapCandidate Candidate =
 						FPolySnapSnapQuery::FindBest(Held, Targets, FTransform::Identity, Tolerances);
@@ -177,8 +181,8 @@ void FPolySnapSnapQuerySpec::Define()
 					const FTransform PanelA = FTransform::Identity;
 					const FTransform PanelB(FRotator(0.0, 178.0, 0.0), FVector(2.0 * HalfPanelUu + 4.0, 2.0, 0.0));
 
-					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, 2000, PrimarySocketAt(PanelB))};
-					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, 2000, PrimarySocketAt(PanelA))};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelB))};
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelA))};
 
 					const FPolySnapCandidate Candidate =
 						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
@@ -200,13 +204,12 @@ void FPolySnapSnapQuerySpec::Define()
 				{
 					const FTransform PanelB(FRotator(0.0, 180.0, 0.0), FVector(2.0 * HalfPanelUu + 2.0, 0.0, 0.0));
 
-					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, 2000, PrimarySocketAt(PanelB))};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelB))};
 
 					// Two targets on the same edge line, one 2 uu away and one 12 uu away.
-					const TArray<FPolySnapWorldSocket> Targets = {
-						MakeSocket(7, 2000,
-							PrimarySocketAt(FTransform(FRotator::ZeroRotator, FVector(10.0, 0.0, 0.0)))),
-						MakeSocket(4, 2000, PrimarySocketAt(FTransform::Identity))};
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(7,
+						TEXT("2000"), PrimarySocketAt(FTransform(FRotator::ZeroRotator, FVector(10.0, 0.0, 0.0)))),
+						MakeSocket(4, TEXT("2000"), PrimarySocketAt(FTransform::Identity))};
 
 					const FPolySnapCandidate Candidate =
 						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
@@ -218,9 +221,9 @@ void FPolySnapSnapQuerySpec::Define()
 			It("records why the pairs that failed did",
 				[this, Tolerances]()
 				{
-					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, 2000, FTransform::Identity)};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(1, TEXT("2000"), FTransform::Identity)};
 					const TArray<FPolySnapWorldSocket> Targets = {
-						MakeSocket(1, 2000, FTransform(FRotator::ZeroRotator, FVector(900.0, 0.0, 0.0)))};
+						MakeSocket(1, TEXT("2000"), FTransform(FRotator::ZeroRotator, FVector(900.0, 0.0, 0.0)))};
 
 					TArray<FPolySnapRejectedPair> Rejections;
 					const FPolySnapCandidate Candidate =

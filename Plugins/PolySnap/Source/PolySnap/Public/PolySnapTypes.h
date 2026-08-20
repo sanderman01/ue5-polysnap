@@ -53,38 +53,44 @@ struct POLYSNAP_API FPolySnapSocketDescriptor
 	EPolySnapEdgeSubType SubType = EPolySnapEdgeSubType::Straight;
 
 	/**
-	 * Panel thickness at the edge, in MILLIMETRES, and a compatibility token rather than a
-	 * measurement. It is what stops a thin partition panel being declared compatible with a thick
-	 * hull panel of the same edge length and mating to a stepped seam.
+	 * Panel thickness at the edge, as an opaque token. It is what stops a thin partition panel
+	 * being declared compatible with a thick hull panel of the same edge length and mating to a
+	 * stepped seam.
 	 *
-	 * Nothing measures it: a socket transform records a point and a basis, not a cross-section,
-	 * so the token is the only statement of thickness there is. See README section 2.2.
+	 * PolySnap never interprets it: no unit is implied, no arithmetic is ever done on it, and the
+	 * only operation is equality against another socket's token. "40", "40mm", "4cm" and "Thin"
+	 * are all legal and all distinct; a project picks one vocabulary and holds it. See README
+	 * section 2.2.
 	 *
 	 * Declared before Length to match the naming grammar, where thickness precedes the subtype's
 	 * own shape parameters because every subtype has it and they differ per subtype.
 	 */
 	UPROPERTY(BlueprintReadOnly, Category = "PolySnap")
-	int32 ThicknessMillimetres = 0;
+	FName Thickness;
 
 	/**
-	 * Nominal edge length in MILLIMETRES, on exactly the same terms as Thickness, and Straight's
-	 * one shape parameter. Unreal units are centimetres; never use this as a length. Snap geometry
-	 * comes entirely from the socket transforms baked into the mesh.
+	 * Nominal edge length, an opaque token on exactly the same terms as Thickness, and Straight's
+	 * one shape parameter. Snap geometry comes entirely from the socket transforms baked into the
+	 * mesh; this field is a label, never a distance.
 	 */
 	UPROPERTY(BlueprintReadOnly, Category = "PolySnap")
-	int32 LengthMillimetres = 0;
+	FName Length;
 
 	/** True once Parse has filled this in. A default-constructed descriptor matches nothing. */
-	[[nodiscard]] bool IsValid() const { return Id > 0 && ThicknessMillimetres > 0 && LengthMillimetres > 0; }
+	[[nodiscard]] bool IsValid() const { return Id > 0 && !Thickness.IsNone() && !Length.IsNone(); }
 
 	/**
 	 * README section 2.2: two sockets may connect only when SubType, Thickness and Length all
 	 * match. The ID never participates -- it is identity, not classification.
+	 *
+	 * FName equality is an interned-index compare, so this stays the cheapest test in the query,
+	 * and it is case-insensitive: "40MM" mates with "40mm". Spelling is otherwise significant --
+	 * "0500" and "500" are different tokens, because nothing here reads them as numbers.
 	 */
 	[[nodiscard]] bool IsCompatibleWith(const FPolySnapSocketDescriptor& Other) const
 	{
-		return IsValid() && Other.IsValid() && SubType == Other.SubType
-			&& ThicknessMillimetres == Other.ThicknessMillimetres && LengthMillimetres == Other.LengthMillimetres;
+		return IsValid() && Other.IsValid() && SubType == Other.SubType && Thickness == Other.Thickness
+			&& Length == Other.Length;
 	}
 };
 

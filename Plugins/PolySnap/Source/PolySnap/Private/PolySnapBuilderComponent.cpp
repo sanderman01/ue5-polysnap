@@ -29,7 +29,7 @@
 
 namespace PolySnapBuilderPrivate
 {
-/** Unreal units are centimetres; the readout speaks millimetres, like the Size token. */
+/** Unreal units are centimetres; the readout speaks millimetres, being a real measured distance. */
 constexpr double UuToMm = 10.0;
 
 /**
@@ -487,8 +487,7 @@ void UPolySnapBuilderComponent::CommitConnection(const FPolySnapCandidate& Candi
 	Constraint->SetDisableCollision(true);
 	Constraint->SetConstrainedComponents(TargetMesh, NAME_None, HeldMesh, NAME_None);
 
-	const double EdgeLengthUu = Candidate.TargetSocket.Descriptor.LengthMillimetres / PolySnapBuilderPrivate::UuToMm;
-	FPolySnapDebug::DrawCommittedJoint(GetWorld(), JointTransform, EdgeLengthUu, Candidate.DihedralDegrees);
+	FPolySnapDebug::DrawCommittedJoint(GetWorld(), JointTransform, Candidate.DihedralDegrees);
 }
 
 void UPolySnapBuilderComponent::TickComponent(float DeltaTime, ELevelTick TickType,

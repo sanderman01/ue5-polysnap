@@ -102,19 +102,6 @@ public:
 
 	// -- Validation, CONVENTIONS.md section 6 -----------------------------------------------
 
-	/** Percentage tolerance on the edge length check. A percentage is deliberate: a panel mislabelled
-	 * by a millimetre announces itself the first time it refuses to snap, faster than any warning. */
-	UPROPERTY(config, EditAnywhere, Category = "Validation", meta = (ClampMin = "0.01", ClampMax = "50.0"))
-	float EdgeLengthTolerancePercent = 1.0f;
-
-	/**
-	 * How deep behind the outermost vertex along a socket's Outward axis to gather vertices when
-	 * measuring that edge. Wide enough to catch a chamfer, narrow enough to exclude the opposite
-	 * side of the panel.
-	 */
-	UPROPERTY(config, EditAnywhere, Category = "Validation", meta = (ClampMin = "0.01", ForceUnits = "cm"))
-	float EdgeProbeDepthUu = 2.0f;
-
 	/** Outward pointing into the piece -- a 180 degree slip, or swapped Outward and Tangent roles. */
 	UPROPERTY(config, EditAnywhere, Category = "Validation")
 	bool bWarnOnInwardOutward = true;

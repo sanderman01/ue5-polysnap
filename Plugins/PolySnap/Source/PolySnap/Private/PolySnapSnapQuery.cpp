@@ -14,8 +14,9 @@ EPolySnapRejection FPolySnapSnapQuery::TestPair(const FPolySnapWorldSocket& Held
 		return EPolySnapRejection::SamePiece;
 	}
 
-	// Cheap integer comparison, so it goes first. SubType, Thickness and Length must all match; the
-	// ID never participates, being identity rather than classification.
+	// Cheap comparison, so it goes first: FName equality is an interned-index compare, not a string
+	// walk. SubType, Thickness and Length must all match; the ID never participates, being identity
+	// rather than classification.
 	if (!HeldSocket.Descriptor.IsCompatibleWith(TargetSocket.Descriptor))
 	{
 		return EPolySnapRejection::Incompatible;

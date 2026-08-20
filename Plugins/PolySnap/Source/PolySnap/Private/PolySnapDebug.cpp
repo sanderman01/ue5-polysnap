@@ -29,7 +29,10 @@ static TAutoConsoleVariable<float> CVarGizmoScale(TEXT("PolySnap.Debug.GizmoScal
 /** Base gizmo arrow length in Unreal units, before the scale multiplier. */
 constexpr double BaseArrowLength = 18.0;
 
-/** Unreal units are centimetres and the debug readout is in millimetres, like the Size token. */
+/** Base length of the committed-joint hinge line, before the scale multiplier. */
+constexpr double BaseJointLength = 60.0;
+
+/** Unreal units are centimetres and the debug readout is in millimetres, being a real distance. */
 constexpr double UuToMm = 10.0;
 
 const FColor OutwardColour = FColor::Red;
@@ -58,7 +61,7 @@ const FColor JointColour = FColor(220, 60, 220);
 
 	return FVector::ZeroVector;
 }
-}
+} // namespace PolySnapDebugPrivate
 
 int32 FPolySnapDebug::GetDrawMode()
 {
@@ -188,8 +191,7 @@ void FPolySnapDebug::DrawPreview(const UWorld* World, const UPolySnapPieceCompon
 #endif
 }
 
-void FPolySnapDebug::DrawCommittedJoint(const UWorld* World, const FTransform& JointTransform, double EdgeLengthUu,
-	double DihedralDegrees)
+void FPolySnapDebug::DrawCommittedJoint(const UWorld* World, const FTransform& JointTransform, double DihedralDegrees)
 {
 #if ENABLE_DRAW_DEBUG
 	using namespace PolySnapDebugPrivate;
@@ -200,7 +202,7 @@ void FPolySnapDebug::DrawCommittedJoint(const UWorld* World, const FTransform& J
 	}
 
 	const FPolySnapSocketBasis Basis = FPolySnapGeometry::BasisFromTransform(JointTransform);
-	const FVector HalfEdge = Basis.Tangent * (EdgeLengthUu * 0.5);
+	const FVector HalfEdge = Basis.Tangent * (BaseJointLength * GetGizmoScale() * 0.5);
 
 	// The shared edge line: the axis the joint is free to hinge about.
 	DrawDebugLine(World, Basis.Location - HalfEdge, Basis.Location + HalfEdge, JointColour, false, 5.0f, 0, 1.5f);

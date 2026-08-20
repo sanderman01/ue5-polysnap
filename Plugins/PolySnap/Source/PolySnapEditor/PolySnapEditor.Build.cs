@@ -19,8 +19,6 @@ public class PolySnapEditor : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"UnrealEd",
-			"MeshDescription",
-			"StaticMeshDescription",
 		});
 	}
 }

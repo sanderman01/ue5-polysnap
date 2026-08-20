@@ -5,19 +5,14 @@
 #include "Algo/AllOf.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
-#include "MeshDescription.h"
 #include "PolySnap.h"
 #include "PolySnapGeometry.h"
 #include "PolySnapSettings.h"
 #include "PolySnapSocketName.h"
 #include "PolySnapTypes.h"
-#include "StaticMeshAttributes.h"
 
 namespace PolySnapMeshValidationPrivate
 {
-/** Unreal units are centimetres and the Size token is millimetres. The only place they meet. */
-constexpr double UuToMm = 10.0;
-
 /** How far from orthonormal a socket's rotation may be before it is called sheared. */
 constexpr double OrthonormalTolerance = 1.0e-4;
 
@@ -90,64 +85,6 @@ int32 FPolySnapValidationReport::CountBySeverity(EPolySnapValidationSeverity Sev
 	}
 
 	return Count;
-}
-
-bool FPolySnapMeshValidation::MeasureEdgeLengthUu(const UStaticMesh* StaticMesh, const FTransform& InSocketTransform,
-	double& OutEdgeLengthUu)
-{
-	OutEdgeLengthUu = 0.0;
-
-	if (StaticMesh == nullptr)
-	{
-		return false;
-	}
-
-	const FMeshDescription* MeshDescription = StaticMesh->GetMeshDescription(0);
-	if (MeshDescription == nullptr || MeshDescription->Vertices().Num() == 0)
-	{
-		return false;
-	}
-
-	const FStaticMeshConstAttributes Attributes(*MeshDescription);
-	const TVertexAttributesConstRef<FVector3f> Positions = Attributes.GetVertexPositions();
-
-	const FPolySnapSocketBasis Basis = FPolySnapGeometry::BasisFromTransform(InSocketTransform);
-	const double ProbeDepth = UPolySnapSettings::Get().EdgeProbeDepthUu;
-
-	// Two passes: find how far the piece reaches along Outward, then measure only what is out
-	// there. One pass would need every projection stored.
-	double MaxOutward = -TNumericLimits<double>::Max();
-	for (const FVertexID VertexID : MeshDescription->Vertices().GetElementIDs())
-	{
-		const FVector Position(Positions[VertexID]);
-		MaxOutward = FMath::Max(MaxOutward, (Position - Basis.Location) | Basis.Outward);
-	}
-
-	double MinTangent = TNumericLimits<double>::Max();
-	double MaxTangent = -TNumericLimits<double>::Max();
-	int32 EdgeVertexCount = 0;
-
-	for (const FVertexID VertexID : MeshDescription->Vertices().GetElementIDs())
-	{
-		const FVector Offset = FVector(Positions[VertexID]) - Basis.Location;
-		if ((Offset | Basis.Outward) < MaxOutward - ProbeDepth)
-		{
-			continue;
-		}
-
-		const double AlongTangent = Offset | Basis.Tangent;
-		MinTangent = FMath::Min(MinTangent, AlongTangent);
-		MaxTangent = FMath::Max(MaxTangent, AlongTangent);
-		++EdgeVertexCount;
-	}
-
-	if (EdgeVertexCount < 2)
-	{
-		return false;
-	}
-
-	OutEdgeLengthUu = MaxTangent - MinTangent;
-	return OutEdgeLengthUu > UE_DOUBLE_SMALL_NUMBER;
 }
 
 void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapValidationReport& OutReport)
@@ -238,35 +175,10 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 					*SocketName, *Socket->RelativeScale.ToString(), Determinant));
 		}
 
-		// -- Hard check 2: the edge length against the Length token -------------------------
-		//
-		// Length is the only size token this can check. Thickness has no counterpart here and is
-		// deliberately not measured: a socket transform records a point and a basis, so there is
-		// nothing in it to compare a cross-section against, and a bounds-derived guess would fire
-		// on every piece that is not a flat slab.
-		double EdgeLengthUu = 0.0;
-		if (MeasureEdgeLengthUu(StaticMesh, Transform, EdgeLengthUu))
-		{
-			const double MeasuredMm = EdgeLengthUu * UuToMm;
-			const double ToleranceMm = Descriptor.LengthMillimetres * (Settings.EdgeLengthTolerancePercent / 100.0);
-
-			if (FMath::Abs(MeasuredMm - Descriptor.LengthMillimetres) > ToleranceMm)
-			{
-				OutReport.Add(EPolySnapValidationSeverity::Error,
-					FString::Printf(TEXT("Socket '%s' sits on an edge measuring %.1f mm but is labelled %d mm (%.1f%% out). "
-							 "A gross mismatch is an export scale error; check Apply Unit and Convert Scene "
-							 "Unit before touching the name."),
-						*SocketName, MeasuredMm, Descriptor.LengthMillimetres,
-						100.0 * FMath::Abs(MeasuredMm - Descriptor.LengthMillimetres) / Descriptor.LengthMillimetres));
-			}
-		}
-		else
-		{
-			OutReport.Add(EPolySnapValidationSeverity::Warning,
-				FString::Printf(TEXT("Socket '%s': could not find an edge under it to measure, so the length "
-									 "token was not checked."),
-					*SocketName));
-		}
+		// Neither size token is checked against the mesh. They carry no unit and are never read as
+		// numbers -- the only thing either one is for is equality against the matching field on
+		// another socket (README section 2.2) -- so there is no measurement for a check to compare
+		// them to.
 
 		// -- Warnings, each behind its own switch ------------------------------------------
 		if (Settings.bWarnOnInwardOutward)

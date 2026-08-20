@@ -55,21 +55,4 @@ public:
 
 	/** Runs every check and writes the result to LogPolySnap. Returns false if anything errored. */
 	static bool ValidateAndLog(const UStaticMesh* StaticMesh);
-
-	/**
-	 * Measures the real length of the edge a socket sits on, in Unreal units.
-	 *
-	 * Takes the vertices at the extreme of the socket's Outward axis -- within a probe depth, so a
-	 * chamfer still counts -- and returns their extent along the socket's Tangent. Projecting the
-	 * mesh bounds instead would be right for a rectangle and wrong for the hexagon Milestone 2
-	 * needs, where the bounds along an edge direction are the whole panel's width.
-	 *
-	 * SocketTransform must already be in the canonical axis convention -- run it through
-	 * FPolySnapGeometry::Canonicalise first, or Outward and Tangent name the wrong directions and
-	 * this measures some other edge without complaining.
-	 *
-	 * @return false when too few vertices lie on that edge to measure it.
-	 */
-	[[nodiscard]] static bool MeasureEdgeLengthUu(const UStaticMesh* StaticMesh, const FTransform& SocketTransform,
-		double& OutEdgeLengthUu);
 };

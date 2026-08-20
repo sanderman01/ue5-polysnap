@@ -18,27 +18,25 @@ where they appear, and are enforced only by a validator warning (§6).
 | Handedness | right | right | left |
 | Unit | 1 unit = 1 m | **centimetres** | 1 unit = 1 cm |
 
-The naming grammar's two size fields, `Thickness` and `Length`, add a fourth unit. The chain for
-a nominal 2000 edge:
+Three units, and the chain for the calibration panel's 2 m edge:
 
 ```
-Length token 2000        (millimetres — a label, never used in math)
 Blender      2.0 m
 FBX          200.0       (centimetres)
 Unreal       200.0 uu
 ```
 
-`Thickness` runs down the same chain: the 40 mm calibration panel is 0.04 m in Blender and 4.0 uu
-in Unreal. Unlike `Length` it is never measured back off the asset (README §2.2), so the token is
-the only place the number is recorded.
-
 Default Blender scene settings with default export and import settings (§4, §5) put exactly
 **one** scaling step in that chain: Blender's export, converting metres to FBX's centimetres.
 Nothing else may scale. A panel that imports 100× too small or too large means a second
-conversion is switched on somewhere; §7's first check confirms this once.
+conversion is switched on somewhere; §7's first check confirms this once, and it is the only
+place that error is caught.
 
-Both size tokens are compared for equality and nothing else (README §2.2). The one place these units are
-related is the import-time validator (§6).
+**The naming grammar's two size fields are not part of this chain.** `Thickness` and `Length` are
+opaque tokens with no unit at all — compared for equality and nothing else, never converted, never
+measured back off the asset (README §2.2). A project may spell them `40`/`2000`, `4cm`/`2m` or
+`Hull`/`Long`; this document's examples use the first because the calibration panel is quoted in
+millimetres, not because the grammar knows what a millimetre is.
 
 ---
 
@@ -189,7 +187,8 @@ The **object name** in the outliner becomes the FBX node name, and therefore the
 not the data name, not a custom property.
 
 Follow README §2.2 exactly: `SOCKET_Edge_001_Straight_40_2000` — the last two fields are the
-edge's length and the panel's thickness, both in millimetres. Because Blender object names are
+panel's thickness and then the edge's length, in that order, and in whatever vocabulary this
+project has settled on (here, millimetres unadorned). Because Blender object names are
 unique per *file*, a socket may also carry an **authoring tail** — anything from a `.` onward,
 which the parser ignores. The importer **rewrites that `.` to `_`** (§5), so the tail reaches
 Unreal as a sixth field rather than verbatim, and that sixth field is the only spelling the
@@ -289,23 +288,23 @@ checking ID uniqueness.** The other way round, two pieces sharing a `.blend` fai
 neither of them has. Sockets not named `Edge_*` belong to some other system and are skipped
 without a diagnostic (README §2.2).
 
-Two hard checks, and they are deliberately few:
+One hard check, and it is deliberately alone:
 
 | Check | Catches |
 | --- | --- |
 | The socket's rotation matrix is orthonormal with determinant +1, and socket scale ≈ 1 | A scaled, sheared, or mirrored empty. Read the **raw matrix**, not `GetUnitAxis` — that accessor goes through `TransformVectorNoScale`, so a check written on its output is orthonormal by construction and can never fail. |
-| `EdgeLength_uu * 10` is within **1%** of `Length_mm` | A wrong export scale. |
 
-`Thickness` gets no row: a socket transform carries a point and a basis, not a cross-section, so
-there is nothing to measure it against (README §2.2). It is checked as a token by the parser and
-no further.
+Neither size field gets a row. `Thickness` never could: a socket transform carries a point and a
+basis, not a cross-section, so there is nothing to measure it against. `Length` no longer can
+either — the token states no unit, so a measured edge in Unreal units has nothing to be compared
+to. Both are checked as tokens by the parser, and no further (README §2.2).
 
-The scale check is the one that earns its keep, though not for the reason it looks like. Its
-value is catching a 100× unit error on asset one rather than 40 assets later; `Length` is simply
-the free oracle that makes such a check possible at all, since the name states an intended
-length. It is **not** a label check — a percentage tolerance is deliberate, because a panel
-mislabelled by a millimetre or two announces itself the first time it refuses to snap, which is
-faster and clearer than any import warning.
+An earlier version of this document had a second hard check here: `EdgeLength_uu * 10` within 1%
+of `Length_mm`, catching a wrong export scale. Its value was never really label-checking — it was
+catching a 100× unit error on asset one rather than 40 assets later, with `Length` as the free
+oracle that made it possible. Unit-free tokens remove the oracle, so **§7's bounds check is now
+the only thing standing between you and a 100× scale error.** Run it when the pipeline changes,
+not just once at the start.
 
 Everything else is a **warning** a project that authors differently can disable:
 
@@ -358,8 +357,9 @@ impression:
 
 > A **square panel, 2000 × 2000 × 40 mm**, centred on the Blender origin and lying in the XY
 > plane. One empty named `SOCKET_Edge_001_Straight_40_2000`, placed at Blender **`(1.0, 0, 0)`**
-> — the midpoint of the +X edge — with **zero rotation**. The trailing `40` is the panel's
-> thickness in millimetres, taken from the 40 mm in the line above.
+> — the midpoint of the +X edge — with **zero rotation**. The `40` and `2000` are size *tokens*,
+> not measurements: they read as the panel's millimetres because that is the vocabulary this
+> project uses, and nothing in the grammar or the validator interprets them (README §2.2).
 
 Zero rotation is the point of the design: §2's Blender column makes an unrotated empty a correct
 socket for the +X edge, so anything the socket shows in Unreal other than what check 3 states
@@ -367,7 +367,9 @@ came from the pipeline and nothing else. Author per §3, export per §4, import 
 
 ### The checks
 
-1. **Scale.** The mesh bounds read **200 × 200 × 4 uu**.
+1. **Scale.** The mesh bounds read **200 × 200 × 4 uu**. This is the *only* check on export
+   scale anywhere in the pipeline — the size tokens carry no unit, so the validator cannot
+   second-guess it per asset (§6). Re-run it whenever the Blender or Interchange settings move.
 2. **Socket position.** The socket sits at **`(100, 0, 0)`** in the static mesh editor — Blender
    `(1.0, 0, 0)` is one metre along +X, which is 100 uu along Unreal +X.
 3. **Socket axes.** The gizmo reads: **red (+X)** points away
