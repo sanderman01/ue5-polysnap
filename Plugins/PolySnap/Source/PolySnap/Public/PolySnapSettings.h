@@ -8,6 +8,12 @@
 
 #include "PolySnapSettings.generated.h"
 
+#if WITH_EDITOR
+/** Fired whenever a PolySnap setting is edited in the settings panel. Editor only: it exists so a
+ *  running PIE session can re-apply a value that is otherwise only read once, at BeginPlay. */
+DECLARE_MULTICAST_DELEGATE(FPolySnapSettingsChanged);
+#endif
+
 /**
  * PolySnap's own settings, shipped with the plugin rather than kept in project config.
  *
@@ -33,6 +39,15 @@ public:
 	//~ Begin UDeveloperSettings interface
 	virtual FName GetCategoryName() const override;
 	//~ End UDeveloperSettings interface
+
+#if WITH_EDITOR
+	//~ Begin UObject interface
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+	//~ End UObject interface
+
+	/** Subscribe to retune without leaving PIE. Broadcast on every edit made in the settings panel. */
+	[[nodiscard]] static FPolySnapSettingsChanged& OnSettingsChanged();
+#endif
 
 	// -- Conventions, CONVENTIONS.md section 2 ----------------------------------------------
 
@@ -93,12 +108,36 @@ public:
 	/**
 	 * Damping applied to a released piece. Gravity is zero in this game, so without damping a
 	 * nudged panel drifts out of the level and never comes back.
+	 *
+	 * Angular wants to be the higher of the two: a spinning panel is more disorienting than a
+	 * drifting one, and it is rotation that makes a socket hard to line up. Past roughly 15 the
+	 * damping starts to fight the joint solver, and a loose assembly settles slowly rather than
+	 * quickly -- at that point the thing to tune is joint stiffness, not this.
 	 */
 	UPROPERTY(config, EditAnywhere, Category = "Physics", meta = (ClampMin = "0.0"))
-	float PieceLinearDamping = 1.5f;
+	float PieceLinearDamping = 5.0f;
 
 	UPROPERTY(config, EditAnywhere, Category = "Physics", meta = (ClampMin = "0.0"))
-	float PieceAngularDamping = 2.0f;
+	float PieceAngularDamping = 8.0f;
+
+	/**
+	 * Whether a settled piece may fall asleep sooner than the engine's default threshold.
+	 *
+	 * Damping approaches zero velocity asymptotically and never arrives, so a piece keeps
+	 * crawling long after it looks stopped. Sleep is what actually ends the motion, and a
+	 * sleeping island costs the solver nothing as assemblies grow.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Physics")
+	bool bUsePieceSleepThreshold = true;
+
+	/**
+	 * Multiplies the linear and angular velocities below which a piece counts as at rest, so a
+	 * higher value sleeps sooner. The velocities themselves come from the body's physical
+	 * material, or from Chaos's defaults where it has none.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Physics",
+		meta = (ClampMin = "0.1", EditCondition = "bUsePieceSleepThreshold"))
+	float PieceSleepThresholdMultiplier = 5.0f;
 
 	// -- Validation, CONVENTIONS.md section 6 -----------------------------------------------
 

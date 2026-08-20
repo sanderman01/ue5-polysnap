@@ -27,6 +27,7 @@ public:
 
 	//~ Begin AActor interface
 	virtual void BeginPlay() override;
+	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
 	//~ End AActor interface
 
 	/**
@@ -52,8 +53,19 @@ public:
 	[[nodiscard]] bool IsSimulating() const;
 
 private:
-	/** Applies the damping from UPolySnapSettings. Without it a nudged panel drifts away for good. */
+	/**
+	 * Applies the damping and sleep thresholds from UPolySnapSettings. Without them a nudged panel
+	 * drifts away for good, and even a damped one never quite stops.
+	 *
+	 * Safe to call on a piece that is already simulating: everything it sets is pushed to the live
+	 * body, which is what lets the settings be retuned during PIE.
+	 */
 	void ApplyPhysicsSettings();
+
+#if WITH_EDITOR
+	/** Subscription to UPolySnapSettings, so an edit in the settings panel reaches a live piece. */
+	FDelegateHandle SettingsChangedHandle;
+#endif
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PolySnap", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> MeshComponent;
