@@ -1,0 +1,19 @@
+.gitignore
+  s_0def656f6cb6ce::t_1348bf6fca8d2f 6-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "5e021550b6817d3bfc545f75ca5877d77d0ef352",
+  "prompts": {},
+  "sessions": {
+    "s_0def656f6cb6ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "badbbc8a-e630-4dae-a34a-0685d63bebb3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
