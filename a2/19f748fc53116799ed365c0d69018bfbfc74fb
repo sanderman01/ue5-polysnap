@@ -1,0 +1,46 @@
+README.md
+  s_36f45fea54c26e::t_2973064910acea 168-170,172-177,179-205,211,215-218
+  s_36f45fea54c26e::t_816998bf7446a6 261-267,278-283,321-325,534-535,842-845
+  s_36f45fea54c26e::t_ff264d83267af1 91-92,113-117,144-145,151,158-160
+CONVENTIONS.md
+  s_36f45fea54c26e::t_2edd2fc0454ae2 360-362,370-372
+  s_36f45fea54c26e::t_4d55ebc57bf1ad 21,32-33,35-39,190-191,291,297-300,302-307
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapSocketName.cpp
+  s_36f45fea54c26e::t_31ae459258a893 57-66,72-73,75,77,81,83-89,92,229-230,238-239,244-245,253-254
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapTypes.h
+  s_36f45fea54c26e::t_907425c6accbf6 56-58,60-63,69,72-74,77,80,85-88,92-93
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapSnapQuery.cpp
+  s_36f45fea54c26e::t_e6f9516b7ef90e 17-19
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapBuilderComponent.cpp
+  s_36f45fea54c26e::t_d636ab1dcdb92f 32,490
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapDebug.h
+  s_36f45fea54c26e::t_647e71363c1f66 61-68
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapSocketNameSpec.cpp
+  s_36f45fea54c26e::t_16d0bd92b67825 52-53,56,60-61,65-101,116-117,159-161,209,212-215,221-222,230,246-248,251-259,314-319,323-348
+  s_36f45fea54c26e::t_6a3ce9ff5adea9 320-322
+  s_36f45fea54c26e::t_6f4f8dfe102653 349
+Plugins/PolySnap/Source/PolySnapEditor/Private/PolySnapMeshValidation.cpp
+  s_36f45fea54c26e::t_d02a5defaf9b22 178-181
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapSnapQuerySpec.cpp
+  s_36f45fea54c26e::t_6400b0760a3440 13,16-17,22-24,28-29,35-36,67-68,83-84,95,97,108,122,146,148,166,168,184-185,207,212,224,226
+  s_36f45fea54c26e::t_6a3ce9ff5adea9 32,109-110,125-126,133-134,210-211
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapDebug.cpp
+  s_36f45fea54c26e::t_647e71363c1f66 32-35,194,205
+  s_36f45fea54c26e::t_6a3ce9ff5adea9 64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "a219f748fc53116799ed365c0d69018bfbfc74fb",
+  "prompts": {},
+  "sessions": {
+    "s_36f45fea54c26e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9c724f37-45a2-422f-bf0e-edcc0a55bd4d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
