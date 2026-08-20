@@ -62,10 +62,8 @@ private:
 	 */
 	void ApplyPhysicsSettings();
 
-#if WITH_EDITOR
-	/** Subscription to UPolySnapSettings, so an edit in the settings panel reaches a live piece. */
+	/** Subscription to UPolySnapSettings, so a retune reaches a piece that is already simulating. */
 	FDelegateHandle SettingsChangedHandle;
-#endif
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PolySnap", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> MeshComponent;

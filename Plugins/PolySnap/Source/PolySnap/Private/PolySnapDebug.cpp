@@ -9,8 +9,14 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
+#include "Physics/PhysicsInterfaceCore.h"
+#include "PhysicsEngine/BodyInstance.h"
+#include "PhysicsProxy/SingleParticlePhysicsProxy.h"
+#include "PolySnap.h"
 #include "PolySnapGeometry.h"
 #include "PolySnapPieceComponent.h"
+#include "PolySnapSettings.h"
+#include "PolySnapSubsystem.h"
 
 namespace PolySnapDebugPrivate
 {
@@ -61,6 +67,133 @@ const FColor JointColour = FColor(220, 60, 220);
 
 	return FVector::ZeroVector;
 }
+
+[[nodiscard]] const TCHAR* DescribeObjectState(Chaos::EObjectStateType State)
+{
+	switch (State)
+	{
+		case Chaos::EObjectStateType::Sleeping:
+			return TEXT("asleep");
+		case Chaos::EObjectStateType::Dynamic:
+			return TEXT("awake");
+		case Chaos::EObjectStateType::Kinematic:
+			return TEXT("kinematic");
+		case Chaos::EObjectStateType::Static:
+			return TEXT("static");
+		default:
+			return TEXT("uninitialised");
+	}
+}
+
+/**
+ * Reports what each piece's body actually has, as opposed to what the settings asked for.
+ *
+ * The two are not the same thing, and the gap between them is where a piece that will not settle
+ * hides: a value can be written to a body instance and never reach the particle the solver reads.
+ * This prints both sides, plus the state and speed that say whether the piece is still being
+ * driven by something.
+ */
+void DumpPhysics(UWorld* World)
+{
+	const UPolySnapSubsystem* Subsystem = World != nullptr ? World->GetSubsystem<UPolySnapSubsystem>() : nullptr;
+	if (Subsystem == nullptr)
+	{
+		UE_LOG(LogPolySnap, Warning, TEXT("PolySnap.DumpPhysics: no PolySnap subsystem in this world."));
+		return;
+	}
+
+	const UPolySnapSettings& Settings = UPolySnapSettings::Get();
+	UE_LOG(LogPolySnap, Display,
+		TEXT("PolySnap physics dump. Settings ask for damping %.2f linear, %.2f angular; sleep %s x%.2f."),
+			Settings.PieceLinearDamping, Settings.PieceAngularDamping,
+			Settings.bUsePieceSleepThreshold ? TEXT("custom") : TEXT("normal"), Settings.PieceSleepThresholdMultiplier);
+
+	int32 PieceCount = 0;
+
+	for (const TWeakObjectPtr<UPolySnapPieceComponent>& WeakPiece : Subsystem->GetRegisteredPieces())
+	{
+		const UPolySnapPieceComponent* Piece = WeakPiece.Get();
+		if (Piece == nullptr)
+		{
+			continue;
+		}
+
+		++PieceCount;
+
+		const AActor* Owner = Piece->GetOwner();
+		UMeshComponent* Mesh = Piece->GetResolvedSocketMesh();
+		if (Mesh == nullptr)
+		{
+			UE_LOG(LogPolySnap, Warning, TEXT("  %s: no resolved socket mesh."), *GetNameSafe(Owner));
+			continue;
+		}
+
+		const FBodyInstance* Body = Mesh->GetBodyInstance();
+		FPhysicsActorHandle Handle = Body != nullptr ? Body->GetPhysicsActor() : nullptr;
+		if (Handle == nullptr)
+		{
+			UE_LOG(LogPolySnap, Warning, TEXT("  %s: no physics body."), *GetNameSafe(Owner));
+			continue;
+		}
+
+		// What the solver will actually use this tick, read straight off the particle rather than
+		// from the body instance that was asked to set it.
+		const Chaos::FRigidBodyHandle_External& Particle = Handle->GetGameThreadAPI();
+		const double LinearSpeed = Mesh->GetPhysicsLinearVelocity().Size();
+		const double AngularSpeed = Mesh->GetPhysicsAngularVelocityInDegrees().Size();
+
+		UE_LOG(LogPolySnap, Display,
+			TEXT("  %-38s %-11s v %7.2f cm/s  w %7.2f deg/s  drag %5.2f/%5.2f (asked %5.2f/%5.2f)  ")
+				TEXT("sleep x%.2f  connections %d  class %s"), *GetNameSafe(Owner),
+					DescribeObjectState(Particle.ObjectState()), LinearSpeed, AngularSpeed, Particle.LinearEtherDrag(),
+					Particle.AngularEtherDrag(), Settings.PieceLinearDamping, Settings.PieceAngularDamping,
+					Body->GetSleepThresholdMultiplier(), Piece->GetConnections().Num(),
+					*GetNameSafe(Owner != nullptr ? Owner->GetClass() : nullptr));
+	}
+
+	UE_LOG(LogPolySnap, Display, TEXT("PolySnap physics dump: %d piece(s)."), PieceCount);
+}
+
+/** PolySnap.SetDamping <linear> <angular> [sleepMultiplier] -- retune from inside PIE. */
+void SetDamping(const TArray<FString>& Args)
+{
+	if (Args.Num() < 2)
+	{
+		UE_LOG(LogPolySnap, Warning, TEXT("Usage: PolySnap.SetDamping <linear> <angular> [sleepMultiplier]"));
+		return;
+	}
+
+	UPolySnapSettings* Settings = GetMutableDefault<UPolySnapSettings>();
+	check(Settings != nullptr);
+
+	Settings->PieceLinearDamping = FCString::Atof(*Args[0]);
+	Settings->PieceAngularDamping = FCString::Atof(*Args[1]);
+
+	if (Args.Num() >= 3)
+	{
+		Settings->PieceSleepThresholdMultiplier = FCString::Atof(*Args[2]);
+		Settings->bUsePieceSleepThreshold = Settings->PieceSleepThresholdMultiplier > 0.0f;
+	}
+
+	// The same broadcast the settings panel makes, so every live piece re-applies. Nothing is
+	// written to the ini: a value found this way is meant to be typed into Project Settings once
+	// it is the one you want to keep.
+	UPolySnapSettings::OnSettingsChanged().Broadcast();
+
+	UE_LOG(LogPolySnap, Display,
+		TEXT("PolySnap damping now %.2f linear, %.2f angular; sleep %s x%.2f."), Settings->PieceLinearDamping,
+			Settings->PieceAngularDamping,
+			Settings->bUsePieceSleepThreshold ? TEXT("custom")
+											  : TEXT("normal"), Settings->PieceSleepThresholdMultiplier);
+}
+
+static FAutoConsoleCommandWithWorld CmdDumpPhysics(TEXT("PolySnap.DumpPhysics"),
+	TEXT("Logs what each PolySnap piece's body actually has: state, speed, damping, sleep multiplier."),
+		FConsoleCommandWithWorldDelegate::CreateStatic(&DumpPhysics));
+
+static FAutoConsoleCommand CmdSetDamping(TEXT("PolySnap.SetDamping"),
+	TEXT("PolySnap.SetDamping <linear> <angular> [sleepMultiplier]. Applies to every live piece at once."),
+		FConsoleCommandWithArgsDelegate::CreateStatic(&SetDamping));
 } // namespace PolySnapDebugPrivate
 
 int32 FPolySnapDebug::GetDrawMode()

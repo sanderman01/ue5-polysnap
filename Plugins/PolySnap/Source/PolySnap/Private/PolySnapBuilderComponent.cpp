@@ -54,16 +54,30 @@ void SetPieceSimulating(UPolySnapPieceComponent* Piece, bool bSimulate)
 	if (APolySnapPiece* SnapPiece = Cast<APolySnapPiece>(Piece->GetOwner()))
 	{
 		SnapPiece->SetSimulating(bSimulate);
-		return;
 	}
-
 	// UMeshComponent is already a UPrimitiveComponent, so no cast is involved.
-	if (UMeshComponent* Mesh = Piece->GetResolvedSocketMesh())
+	else if (UMeshComponent* Mesh = Piece->GetResolvedSocketMesh())
 	{
 		Mesh->SetSimulatePhysics(bSimulate);
 	}
+
+	if (!bSimulate)
+	{
+		return;
+	}
+
+	// A carried piece is kinematic and is teleported to the solved transform every frame, so the
+	// solver has been deriving a velocity from the player's own movement. Handing the body back to
+	// the simulation still carrying it is what sends a just-placed piece wandering off: the player
+	// put it there, so it starts at rest and damping has nothing to bleed off.
+	UMeshComponent* Mesh = Piece->GetResolvedSocketMesh();
+	if (Mesh != nullptr && Mesh->IsSimulatingPhysics())
+	{
+		Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+		Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+	}
 }
-}
+} // namespace PolySnapBuilderPrivate
 
 UPolySnapBuilderComponent::UPolySnapBuilderComponent()
 {

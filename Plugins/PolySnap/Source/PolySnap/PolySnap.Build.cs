@@ -18,6 +18,7 @@ public class PolySnap : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
+			"Chaos",
 			"EnhancedInput",
 			"InputCore",
 			"PhysicsCore",

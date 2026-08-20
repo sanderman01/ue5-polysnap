@@ -8,11 +8,10 @@
 
 #include "PolySnapSettings.generated.h"
 
-#if WITH_EDITOR
-/** Fired whenever a PolySnap setting is edited in the settings panel. Editor only: it exists so a
- *  running PIE session can re-apply a value that is otherwise only read once, at BeginPlay. */
+/** Fired whenever a PolySnap setting changes at runtime, from the settings panel or from
+ *  PolySnap.SetDamping. It exists so a live piece can re-apply a value that is otherwise only read
+ *  once, at BeginPlay. */
 DECLARE_MULTICAST_DELEGATE(FPolySnapSettingsChanged);
-#endif
 
 /**
  * PolySnap's own settings, shipped with the plugin rather than kept in project config.
@@ -44,10 +43,10 @@ public:
 	//~ Begin UObject interface
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 	//~ End UObject interface
-
-	/** Subscribe to retune without leaving PIE. Broadcast on every edit made in the settings panel. */
-	[[nodiscard]] static FPolySnapSettingsChanged& OnSettingsChanged();
 #endif
+
+	/** Subscribe to retune without leaving PIE. Broadcast on every settings-panel edit. */
+	[[nodiscard]] static FPolySnapSettingsChanged& OnSettingsChanged();
 
 	// -- Conventions, CONVENTIONS.md section 2 ----------------------------------------------
 

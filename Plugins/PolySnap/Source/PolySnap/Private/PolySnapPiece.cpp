@@ -30,21 +30,17 @@ void APolySnapPiece::BeginPlay()
 	ApplyPhysicsSettings();
 	SetSimulating(!bStartAnchored);
 
-#if WITH_EDITOR
 	// Damping is a feel value, and feel values are found by trying them. Re-applying on every
-	// settings edit means a value can be changed in Project Settings while PIE runs and felt
-	// immediately, instead of costing a restart per attempt.
+	// settings change means a value can be changed in Project Settings, or with PolySnap.SetDamping,
+	// while PIE runs and felt immediately, instead of costing a restart per attempt.
 	SettingsChangedHandle =
 		UPolySnapSettings::OnSettingsChanged().AddWeakLambda(this, [this]() { ApplyPhysicsSettings(); });
-#endif
 }
 
 void APolySnapPiece::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-#if WITH_EDITOR
 	UPolySnapSettings::OnSettingsChanged().Remove(SettingsChangedHandle);
 	SettingsChangedHandle.Reset();
-#endif
 
 	Super::EndPlay(EndPlayReason);
 }

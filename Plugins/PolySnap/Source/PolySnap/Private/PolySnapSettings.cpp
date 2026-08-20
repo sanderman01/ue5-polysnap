@@ -21,7 +21,6 @@ FName UPolySnapSettings::GetCategoryName() const
 	return TEXT("Plugins");
 }
 
-#if WITH_EDITOR
 FPolySnapSettingsChanged& UPolySnapSettings::OnSettingsChanged()
 {
 	static FPolySnapSettingsChanged Delegate;
@@ -29,6 +28,7 @@ FPolySnapSettingsChanged& UPolySnapSettings::OnSettingsChanged()
 	return Delegate;
 }
 
+#if WITH_EDITOR
 void UPolySnapSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
