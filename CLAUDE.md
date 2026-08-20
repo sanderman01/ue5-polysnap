@@ -52,6 +52,14 @@ C++ class with a deliberate Blueprint-facing surface.
 Framework choices (Enhanced Input, GAS, StateTree, Mass, subsystems) are undecided — raise
 them per feature rather than assuming a stack.
 
+## Version Control
+
+- At the start of a task, switch to a new branch.
+- For each logical self-contained independent set of changes, do a commit after veryifying correctness and build success.
+- Only commit those files that you have been working on during that task or session.
+- If a task is long or complex, then split work over multiple commits.
+- If you have not commited at the end of a task. Then do so before prompting the user.
+
 ## Building and testing
 
 Use the **`unreal-build`** skill for anything that compiles, and the **`automation-tests`**
