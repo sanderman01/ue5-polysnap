@@ -1,0 +1,14 @@
+CLAUDE.md
+  h_72decab43bbb75 60-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "1b1a9cc00e7264e4c6a2428dfbf448ca3efff7b1",
+  "prompts": {},
+  "humans": {
+    "h_72decab43bbb75": {
+      "author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
