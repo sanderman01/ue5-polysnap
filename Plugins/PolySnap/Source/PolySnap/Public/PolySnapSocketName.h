@@ -21,12 +21,12 @@ enum class EPolySnapParseResult : uint8
 /**
  * The socket naming grammar of README section 2.2:
  *
- *     SOCKET_Edge_<ID>_<SubType>_<Size>[.<AuthoringTail>]      as authored
- *     Edge_001_Straight_2000_Pent                              as imported
+ *     SOCKET_Edge_<ID>_<SubType>_<Thickness>_<Length>[.<AuthoringTail>]    as authored
+ *     Edge_001_Straight_40_2000_Pent                                       as imported
  *
  * Unreal strips the SOCKET_ prefix at import, so the names this class sees begin at Edge_ -- and
  * it rewrites the tail's '.' to '_', so the underscore spelling is the only one that ever reaches
- * here. The head has fixed arity, which is what keeps that unambiguous: four fields, and anything
+ * here. The head has fixed arity, which is what keeps that unambiguous: five fields, and anything
  * after them is tail.
  *
  * Everything here is pure: it takes a string and returns fields, with no engine state involved.
@@ -41,15 +41,15 @@ public:
 	static constexpr TCHAR FieldSeparator = TEXT('_');
 
 	/**
-	 * Splits an authoring tail off a socket name: everything past the four-field head.
+	 * Splits an authoring tail off a socket name: everything past the five-field head.
 	 *
 	 * Blender object names are unique per file rather than per object, so a hex and a pent
-	 * authored together cannot both own SOCKET_Edge_001_Straight_2000 and Blender appends a
+	 * authored together cannot both own SOCKET_Edge_001_Straight_40_2000 and Blender appends a
 	 * suffix to the second. Everything past the head is authoring scratch: not identity, not
 	 * compatibility, and read by nothing at runtime.
 	 *
 	 * The '.' the grammar reserves for the tail does not survive import -- Unreal rewrites it to
-	 * '_' -- so there is nothing to look for but the fifth field.
+	 * '_' -- so there is nothing to look for but the sixth field.
 	 *
 	 * @param SocketName  The full socket name.
 	 * @param OutHead     The name with the tail removed.
@@ -62,7 +62,7 @@ public:
 	 *
 	 * The three-way result is the point. README section 2.2 requires that a socket which is not
 	 * PolySnap's is passed over without a diagnostic, while one that is PolySnap's and malformed
-	 * fails loudly -- Edge_01_Straight_2000 is a typo, not a foreign socket. A bool cannot
+	 * fails loudly -- Edge_01_Straight_40_2000 is a typo, not a foreign socket. A bool cannot
 	 * express that difference.
 	 *
 	 * The tag and subtype compare case-insensitively. A wrongly-cased tag would otherwise be

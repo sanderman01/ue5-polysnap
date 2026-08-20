@@ -71,15 +71,15 @@ not of this plugin — see "Sockets PolySnap does not own" below.
 #### The naming grammar
 
 ```
-SOCKET_Edge_<ID>_<SubType>_<Size>[.<AuthoringTail>]
+SOCKET_Edge_<ID>_<SubType>_<Thickness>_<Length>[.<AuthoringTail>]
 
-SOCKET_Edge_001_Straight_2000
-SOCKET_Edge_001_Straight_2000.Pent
+SOCKET_Edge_001_Straight_40_2000
+SOCKET_Edge_001_Straight_40_2000.Pent
 ```
 
 After import the engine strips the `SOCKET_` prefix, so the socket is named
-`Edge_001_Straight_2000`. It also **rewrites the tail's `.` to `_`**, so the second example
-above arrives as `Edge_001_Straight_2000_Pent` — the underscore spelling is the only one the
+`Edge_001_Straight_40_2000`. It also **rewrites the tail's `.` to `_`**, so the second example
+above arrives as `Edge_001_Straight_40_2000_Pent` — the underscore spelling is the only one the
 parser ever sees. See the authoring tail below.
 
 | Field | Example | Meaning |
@@ -88,14 +88,33 @@ parser ever sees. See the authoring tail below.
 | `Edge` | `Edge` | Required namespace tag. Marks the socket as PolySnap's — see below. Not a variable field; it is always this word. |
 | `ID` | `001` | Identity within the piece. Three digits, zero-padded, `001`–`999`. |
 | `SubType` | `Straight` | Edge geometry. **Only `Straight` is in scope** — curves and circles are a later extension. |
-| `Size` | `2000` | Nominal edge length in **millimetres**. Bare integer, no zero-padding, no fixed width. A compatibility token, not a measurement — see below. |
-| `.<Tail>` | `.Pent` | Optional. Everything past the four-field head is authoring scratch: ignored by the parser, never identity and never compatibility — see below. |
+| `Thickness` | `40` | Panel thickness at that edge, in **millimetres**. Bare integer, no zero-padding, no fixed width. What stops a thin panel mating flush-in-name-only to a thick one — see below. |
+| `Length` | `2000` | Nominal edge length in **millimetres**, on exactly the same terms as `Thickness`. A compatibility token, not a measurement — see below. |
+| `.<Tail>` | `.Pent` | Optional. Everything past the five-field head is authoring scratch: ignored by the parser, never identity and never compatibility — see below. |
 
 **`SOCKET_Edge_<ID>` is a fixed-arity head; everything after it is of variable arity.** This is
 why the ID sits third rather than last: when curved edges arrive they will need more than one
 parameter (a radius *and* an arc length), and they can extend the tail without disturbing how
 every socket's identity is parsed. The `ID` alone is that identity — it is what persistence
 stores (§2.9) and what doubles as network identity (§2.10).
+
+**`Thickness` precedes `Length` because only `Length` belongs to the subtype.** Every edge socket
+has a thickness, whatever shape its edge is. `Length` is `Straight`'s one *shape parameter*, and a
+curved subtype would replace it with two of its own — a radius and an arc length. Keeping the
+subtype's parameters last means they can grow without displacing anything written before them, so
+`Thickness` stays at a fixed position in every subtype:
+
+```
+Edge_001_Straight_40_2000
+Edge_001_Curved_40_500_1571        illustrative; curves are not designed (§7)
+```
+
+The cost is legibility, and it is real: `Straight_40_2000` reads less naturally than
+`Straight_2000_40`, and it inverts the order in which the same panel's dimensions are written
+everywhere else ("2000 × 2000 × 40 mm"). Both numbers are bare integers, so position is the only
+thing telling them apart. That was accepted deliberately in exchange for a grammar whose fields do
+not move when a subtype is added; the field table above is the place to check the order, and the
+parser names the offending field when one of them is malformed.
 
 #### Sockets PolySnap does not own
 
@@ -104,11 +123,11 @@ mounting point for equipment, something a future plugin invents. PolySnap has no
 erroring on those, and the `Edge` tag is how it tells them apart:
 
 > A socket is PolySnap's **only if its name begins `Edge_`** (`SOCKET_Edge_` before import). If
-> it does and the rest fails to parse, that is a loud error — `SOCKET_Edge_01_Straight_2000` is
-> a typo, not a foreign socket. If it does not, the socket is none of PolySnap's business and
+> it does and the rest fails to parse, that is a loud error — `SOCKET_Edge_01_Straight_40_2000`
+> is a typo, not a foreign socket. If it does not, the socket is none of PolySnap's business and
 > is passed over in silence.
 
-This is why the tag stays in the name even though it never varies. `SOCKET_001_Straight_2000`
+This is why the tag stays in the name even though it never varies. `SOCKET_001_Straight_40_2000`
 would work equally well as a format and would give the plugin no way to know whether that
 socket was meant for it.
 
@@ -118,27 +137,37 @@ tail, and the rule above lets both plugins read the same mesh while ignoring eac
 sockets completely. The grammar here is a reasonable thing for it to copy; the point is that it
 copies rather than shares.
 
-**Compatibility:** two sockets may connect only when `SubType` and `Size` both match.
-`Straight_2000` mates only with `Straight_2000`. The `ID` never participates — it is identity,
-not classification.
+**Compatibility:** two sockets may connect only when `SubType`, `Thickness` and `Length` all
+match. `Straight_40_2000` mates only with `Straight_40_2000`. The `ID` never participates — it is
+identity, not classification.
 
-That tuple is sufficient **on the assumption that all pieces share a common thickness and edge
-profile**, so that any two edges of equal length meet flush. Nothing in the geometry records
-this and nothing checks it. A thin partition panel authored against a thick hull panel would be
-declared compatible and would mate to a stepped seam that cannot be airtight; if that piece is
-ever wanted, the compatibility key needs a profile term and this paragraph is the warning that
-it was left out deliberately.
+`Thickness` is in the key because equal edge *length* alone does not make a flush seam. A 40 mm
+partition panel and a 100 mm hull panel with the same 2000 mm edge meet at a step, and nothing
+geometric notices: the two edges are collinear, coincident and exactly the right length, so every
+test in §2.5 passes and the joint is airtight only in the assembly graph. The token is the sole
+place that difference is written down.
+
+**What the key still does not cover is the edge `profile`** — the cross-section's *shape* rather
+than its depth. Two 40 mm edges, one square and one chamfered, are declared compatible and will
+mate to a seam with a groove down it. Closing that needs a term describing the profile itself,
+which is a vocabulary rather than a number and is deliberately not attempted here; §2.4's
+mechanical dihedral clamp is the other place the same missing information shows up. This
+paragraph is the warning that it was left out on purpose.
 
 **A placed piece is never scaled.** Its actor and component scale are 1, and PolySnap should
-`ensure` on anything else. A panel scaled 1.5× in the level has 3000 mm edges while its
-descriptors still read `2000`, so it snaps to things it cannot meet — a lie the validator
+`ensure` on anything else. A panel scaled 1.5× in the level has 3000 mm edges and is 60 mm thick
+while its descriptors still read `2000` and `40`, so it snaps to things it cannot meet — a lie the validator
 cannot catch, because the validator inspects the asset and the scale lives on the instance.
 
-#### `Size` is a token, not a measurement
+#### The size fields are tokens, not measurements
 
-**Nothing in the snap math reads `Size`.** Geometry comes entirely from the socket transforms
-baked into the mesh, which are exact floats; `Size` only answers "may these two edges mate?"
-by equality. It is a category label that happens to be legible.
+**Nothing in the snap math reads `Thickness` or `Length`.** Geometry comes entirely from the
+socket transforms baked into the mesh, which are exact floats; the two size fields only answer
+"may these two edges mate?" by equality. They are category labels that happen to be legible.
+
+`Thickness` is the more literal of the two: a socket transform records a point and a basis, so
+there is no cross-section in the mesh data for the token to be a rounding of, and nothing can
+check it against the asset the way `Length` is checked. The token *is* the statement.
 
 Two properties pick the format:
 
@@ -146,10 +175,12 @@ Two properties pick the format:
   `346.40`) can reach the token.
 - **Millimetres**, because that is the coarsest unit at which integers still separate any two
   lengths anyone would plausibly design as *distinct*. At centimetres, `346` swallows everything
-  from 3455 mm to 3465 mm, and two edges never meant to mate are declared compatible.
+  from 3455 mm to 3465 mm, and two edges never meant to mate are declared compatible. The
+  argument is sharper still for `Thickness`, where the whole plausible range is a few
+  centimetres.
 
-**`Size` is not in Unreal units.** UE units are centimetres; this field is millimetres. Never
-use it as a length in code.
+**Neither size field is in Unreal units.** UE units are centimetres; both fields are
+millimetres. Never use either as a length in code.
 
 Rounding is therefore free — but only because the true lengths already agree. Edge lengths are
 frequently irrational (a regular hexagon of side 2000 has a short diagonal of
@@ -168,20 +199,22 @@ An abstract size vocabulary (`Straight_S`, `Straight_M`) would avoid the roundin
 is opaque at a glance, and reintroduces a centrally maintained vocabulary of the kind removed
 when angles became emergent (§2.4).
 
-**Why `SubType` and `Size` stay separate fields** rather than a fused `Straight2000`: splitting
-a fused token requires scanning for the alpha/digit boundary, which breaks as soon as a subtype
-name contains a digit; and a subtype with two parameters — as curves will have — cannot be
-expressed as "name plus one number" at all. The compatibility key is the tuple either way.
+**Why the three terms stay separate fields** rather than a fused `Straight40x2000`: splitting a
+fused token requires scanning for the alpha/digit boundary, which breaks as soon as a subtype
+name contains a digit, and inventing a second in-field separator for the two numbers just moves
+the delimiter problem inside a field the grammar says has none. A subtype with two parameters —
+as curves will have — cannot be expressed as "name plus one number" at all. The compatibility
+key is the tuple either way.
 
 #### The authoring tail
 
-**Everything past the four-field head is ignored.** It is not identity, not compatibility, and
-nothing at runtime reads it. `SOCKET_Edge_001_Straight_2000.Pent` and
-`SOCKET_Edge_001_Straight_2000` are the same socket as far as PolySnap is concerned.
+**Everything past the five-field head is ignored.** It is not identity, not compatibility, and
+nothing at runtime reads it. `SOCKET_Edge_001_Straight_40_2000.Pent` and
+`SOCKET_Edge_001_Straight_40_2000` are the same socket as far as PolySnap is concerned.
 
 It exists because **Blender object names are unique per `.blend` file, not per object**, and
 collections do not namespace them. A hex and a pent authored in the same file therefore cannot
-both own `SOCKET_Edge_001_Straight_2000`; Blender appends `.001` to whichever came second.
+both own `SOCKET_Edge_001_Straight_40_2000`; Blender appends `.001` to whichever came second.
 Without a rule for the tail, either every panel needs its own file, or socket IDs have to be
 allocated globally across the whole piece set — a centrally maintained vocabulary of exactly
 the kind this grammar exists to avoid.
@@ -194,18 +227,24 @@ invites the misreading described below, which is why the validator warns about i
 Because the tail is not identity, renaming `.Pent` to `.Pentagon` is free and does not touch
 save games (§2.9).
 
-**The importer does not preserve the `.`.** `SOCKET_Edge_004_Straight_2000.Pent` lands in the
-content browser as `Edge_004_Straight_2000_Pent`, so on any imported asset the tail is simply a
-fifth underscore-separated field and the reserved character is not there to find. The parser
-therefore does not look for it at all: it splits on the fifth field and nothing else, which the
+**The importer does not preserve the `.`.** `SOCKET_Edge_004_Straight_40_2000.Pent` lands in the
+content browser as `Edge_004_Straight_40_2000_Pent`, so on any imported asset the tail is simply
+a sixth underscore-separated field and the reserved character is not there to find. The parser
+therefore does not look for it at all: it splits on the sixth field and nothing else, which the
 fixed-arity head above makes unambiguous. A name that still carries a `.` did not come through
 this pipeline, and fails to parse rather than being accommodated by a second code path no asset
 exercises.
 
-The cost is that a genuine typo of the form `Edge_001_Straight_2000_Extra` now parses as a
+The cost is that a genuine typo of the form `Edge_001_Straight_40_2000_Extra` now parses as a
 socket with the tail `Extra` rather than failing as a field-count error. That trade is forced —
 after import the two are the same string — and it is the reason the head's arity is fixed rather
 than merely conventional.
+
+One happy consequence of the arity being load-bearing: a name written to the four-field grammar
+that preceded `Thickness` cannot quietly survive. `Edge_001_Straight_2000` is a field-count error,
+and `Edge_001_Straight_2000_Pent` has the right count but reads `2000` as a thickness and then
+fails on `Pent` as a length. Either way the asset is rejected at import rather than defaulting to
+a thickness nobody chose.
 
 #### Field rules
 
@@ -216,12 +255,13 @@ than merely conventional.
   not an edit, it is a **new asset**. So socket names never change once authored, and nothing —
   a save game, a Blueprint reference, an effect attachment — can be broken by a rename that
   cannot happen.
-- **`ID` is zero-padded to three digits; `Size` is not padded at all.** `Straight_500`, never
-  `Straight_0500` — one size, one spelling. The two fields differ on purpose: `ID` is padded so
-  that Blender's outliner and Unreal's socket manager, both of which sort alphabetically, put
-  `002` before `010`. IDs run past nine on any panel edited a few times, since retired ones are
-  never reused. `Size` has no such ordering to protect and a fixed width would only invite a
-  four-digit assumption that `Straight_500` and `Straight_12000` both break.
+- **`ID` is zero-padded to three digits; neither size field is padded at all.**
+  `Straight_40_500`, never `Straight_040_0500` — one size, one spelling. The fields differ on
+  purpose: `ID` is padded so that Blender's outliner and Unreal's socket manager, both of which
+  sort alphabetically, put `002` before `010`. IDs run past nine on any panel edited a few times,
+  since retired ones are never reused. The size fields have no such ordering to protect and a
+  fixed width would only invite an assumption that `Straight_500` and `Straight_12000` break at
+  one end and a 6 mm skin breaks at the other.
 - **No underscores inside a field.** The underscore is the delimiter.
 - **`.` is reserved.** It opens the authoring tail as authored, and may not appear inside any
   field. Import rewrites it to `_`, so it is a rule about the `.blend`, not about the asset.
@@ -231,7 +271,7 @@ than merely conventional.
 #### Authoring traps
 
 - **Blender's `.001` duplicate suffix.** Duplicating an empty produces
-  `SOCKET_Edge_003_Straight_2000.001` — note the trailing `.001` is Blender's suffix and has
+  `SOCKET_Edge_003_Straight_40_2000.001` — note the trailing `.001` is Blender's suffix and has
   nothing to do with the three-digit `ID` field, which is easy to misread. It is an authoring
   tail like any other and is **stripped**, not rejected.
 
@@ -258,6 +298,11 @@ them has.
 Deliberately *not* checked: near-miss size tokens across the piece set (`Straight_3464` beside
 `Straight_3465`). It would need a project-wide asset scan to catch something a failed snap
 reports in two seconds, and the construct-don't-type rule above is the actual fix.
+
+Also deliberately *not* checked: `Thickness` against the mesh. `Length` is verified by measuring
+the edge under the socket, but a socket transform carries no cross-section, and a guess derived
+from the asset's bounding box would be right only for a flat slab and wrong for every piece that
+is not one. The token is validated as a token — a bare positive integer — and no further.
 
 Names are parsed **once** into a struct and cached — never re-parsed per frame, and never
 string-compared during a snap query. Runtime compatibility tests operate on the parsed fields.
@@ -465,8 +510,9 @@ tolerance to widen. Milestone 2 measures it rather than eyeballing it (§5).
 
 A candidate connection is evaluated as:
 
-1. **Descriptor match** — `SubType` and `Size` both equal (§2.2). `Straight_2000` mates
-   only with `Straight_2000`. Cheap integer comparison, so reject on this first.
+1. **Descriptor match** — `SubType`, `Thickness` and `Length` all equal (§2.2).
+   `Straight_40_2000` mates only with `Straight_40_2000`. Cheap integer comparison, so reject on
+   this first.
 2. **Proximity** — socket positions within a tolerance.
 3. **Orientation** — tangents collinear within a tolerance, in either polarity.
 4. **Joint capacity** — the joint accepts another participant (§2.4). This replaces a simple
@@ -726,7 +772,7 @@ its own panels and gets the same snapping system.
    The real geometric test: log every connection's **adoption residual** (§2.5) and report the
    worst case across the ninety edges. Float-noise residuals mean the snap math and the panel
    outlines are both right. Residuals at a tenth of a millimetre or worse mean the panels are
-   cut wrong — which is a failure the `Size` token cannot see, being a rounded label (§2.2).
+   cut wrong — which is a failure the `Length` token cannot see, being a rounded label (§2.2).
 
    **Run it with the pieces kinematic and physics off.** A constraint solver is iterative and
    leaves its bodies slightly off their ideal positions, so a residual measured against a
@@ -773,7 +819,8 @@ Marked explicitly so nobody builds on them as though they were settled.
   panel meeting two 1 m panels — is *not* addressed by joints (§2.4), which cover panels
   sharing a whole edge line. It would need either sockets with extent along the edge, or
   several sockets authored along the long edge. Deferred deliberately; if it becomes a
-  requirement it likely adds a length field to the naming grammar.
+  requirement it likely adds a *span* field to the naming grammar, distinct from `Length`, which
+  says how much of the edge line one socket claims.
 - **Joint capacity limits.** Whether a joint should ever refuse a participant, and on what
   grounds — physical interpenetration, or nothing at all.
 - **Coincident joints.** Joining two subassemblies normally creates fresh joints between free

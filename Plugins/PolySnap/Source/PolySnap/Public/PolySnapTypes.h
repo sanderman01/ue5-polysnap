@@ -9,7 +9,12 @@
 class UPolySnapPieceComponent;
 
 /**
- * Edge geometry of a socket, the first half of the compatibility key (README section 2.2).
+ * Edge geometry of a socket, the first of the three compatibility terms (README section 2.2).
+ *
+ * It is also what fixes the arity of the fields after it: Length is Straight's one shape
+ * parameter, and a curved subtype would replace it with a radius and an arc length. That is why
+ * the grammar puts the subtype's parameters last and Thickness, which every subtype has, ahead
+ * of them.
  *
  * Only Straight is in scope. Curved subtypes will need more than one parameter -- a radius and
  * an arc length -- which is why the naming grammar puts the subtype after the fixed-arity head
@@ -43,28 +48,43 @@ struct POLYSNAP_API FPolySnapSocketDescriptor
 	UPROPERTY(BlueprintReadOnly, Category = "PolySnap")
 	int32 Id = 0;
 
-	/** Edge geometry. Both halves of the compatibility key must match for two sockets to mate. */
+	/** Edge geometry. All three compatibility terms must match for two sockets to mate. */
 	UPROPERTY(BlueprintReadOnly, Category = "PolySnap")
 	EPolySnapEdgeSubType SubType = EPolySnapEdgeSubType::Straight;
 
 	/**
-	 * Nominal edge length in MILLIMETRES, and a compatibility token rather than a measurement.
-	 * Unreal units are centimetres; never use this as a length. Snap geometry comes entirely
-	 * from the socket transforms baked into the mesh.
+	 * Panel thickness at the edge, in MILLIMETRES, and a compatibility token rather than a
+	 * measurement. It is what stops a thin partition panel being declared compatible with a thick
+	 * hull panel of the same edge length and mating to a stepped seam.
+	 *
+	 * Nothing measures it: a socket transform records a point and a basis, not a cross-section,
+	 * so the token is the only statement of thickness there is. See README section 2.2.
+	 *
+	 * Declared before Length to match the naming grammar, where thickness precedes the subtype's
+	 * own shape parameters because every subtype has it and they differ per subtype.
 	 */
 	UPROPERTY(BlueprintReadOnly, Category = "PolySnap")
-	int32 SizeMillimetres = 0;
-
-	/** True once Parse has filled this in. A default-constructed descriptor matches nothing. */
-	[[nodiscard]] bool IsValid() const { return Id > 0 && SizeMillimetres > 0; }
+	int32 ThicknessMillimetres = 0;
 
 	/**
-	 * README section 2.2: two sockets may connect only when SubType and Size both match. The ID
-	 * never participates -- it is identity, not classification.
+	 * Nominal edge length in MILLIMETRES, on exactly the same terms as Thickness, and Straight's
+	 * one shape parameter. Unreal units are centimetres; never use this as a length. Snap geometry
+	 * comes entirely from the socket transforms baked into the mesh.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "PolySnap")
+	int32 LengthMillimetres = 0;
+
+	/** True once Parse has filled this in. A default-constructed descriptor matches nothing. */
+	[[nodiscard]] bool IsValid() const { return Id > 0 && ThicknessMillimetres > 0 && LengthMillimetres > 0; }
+
+	/**
+	 * README section 2.2: two sockets may connect only when SubType, Thickness and Length all
+	 * match. The ID never participates -- it is identity, not classification.
 	 */
 	[[nodiscard]] bool IsCompatibleWith(const FPolySnapSocketDescriptor& Other) const
 	{
-		return IsValid() && Other.IsValid() && SubType == Other.SubType && SizeMillimetres == Other.SizeMillimetres;
+		return IsValid() && Other.IsValid() && SubType == Other.SubType
+			&& ThicknessMillimetres == Other.ThicknessMillimetres && LengthMillimetres == Other.LengthMillimetres;
 	}
 };
 

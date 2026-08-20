@@ -487,7 +487,7 @@ void UPolySnapBuilderComponent::CommitConnection(const FPolySnapCandidate& Candi
 	Constraint->SetDisableCollision(true);
 	Constraint->SetConstrainedComponents(TargetMesh, NAME_None, HeldMesh, NAME_None);
 
-	const double EdgeLengthUu = Candidate.TargetSocket.Descriptor.SizeMillimetres / PolySnapBuilderPrivate::UuToMm;
+	const double EdgeLengthUu = Candidate.TargetSocket.Descriptor.LengthMillimetres / PolySnapBuilderPrivate::UuToMm;
 	FPolySnapDebug::DrawCommittedJoint(GetWorld(), JointTransform, EdgeLengthUu, Candidate.DihedralDegrees);
 }
 

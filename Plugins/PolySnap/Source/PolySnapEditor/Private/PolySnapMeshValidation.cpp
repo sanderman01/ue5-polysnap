@@ -238,27 +238,32 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 					*SocketName, *Socket->RelativeScale.ToString(), Determinant));
 		}
 
-		// -- Hard check 2: the edge length against the Size token ---------------------------
+		// -- Hard check 2: the edge length against the Length token -------------------------
+		//
+		// Length is the only size token this can check. Thickness has no counterpart here and is
+		// deliberately not measured: a socket transform records a point and a basis, so there is
+		// nothing in it to compare a cross-section against, and a bounds-derived guess would fire
+		// on every piece that is not a flat slab.
 		double EdgeLengthUu = 0.0;
 		if (MeasureEdgeLengthUu(StaticMesh, Transform, EdgeLengthUu))
 		{
 			const double MeasuredMm = EdgeLengthUu * UuToMm;
-			const double ToleranceMm = Descriptor.SizeMillimetres * (Settings.EdgeLengthTolerancePercent / 100.0);
+			const double ToleranceMm = Descriptor.LengthMillimetres * (Settings.EdgeLengthTolerancePercent / 100.0);
 
-			if (FMath::Abs(MeasuredMm - Descriptor.SizeMillimetres) > ToleranceMm)
+			if (FMath::Abs(MeasuredMm - Descriptor.LengthMillimetres) > ToleranceMm)
 			{
 				OutReport.Add(EPolySnapValidationSeverity::Error,
 					FString::Printf(TEXT("Socket '%s' sits on an edge measuring %.1f mm but is labelled %d mm (%.1f%% out). "
 							 "A gross mismatch is an export scale error; check Apply Unit and Convert Scene "
 							 "Unit before touching the name."),
-						*SocketName, MeasuredMm, Descriptor.SizeMillimetres,
-						100.0 * FMath::Abs(MeasuredMm - Descriptor.SizeMillimetres) / Descriptor.SizeMillimetres));
+						*SocketName, MeasuredMm, Descriptor.LengthMillimetres,
+						100.0 * FMath::Abs(MeasuredMm - Descriptor.LengthMillimetres) / Descriptor.LengthMillimetres));
 			}
 		}
 		else
 		{
 			OutReport.Add(EPolySnapValidationSeverity::Warning,
-				FString::Printf(TEXT("Socket '%s': could not find an edge under it to measure, so the size "
+				FString::Printf(TEXT("Socket '%s': could not find an edge under it to measure, so the length "
 									 "token was not checked."),
 					*SocketName));
 		}

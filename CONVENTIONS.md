@@ -18,21 +18,26 @@ where they appear, and are enforced only by a validator warning (§6).
 | Handedness | right | right | left |
 | Unit | 1 unit = 1 m | **centimetres** | 1 unit = 1 cm |
 
-The naming grammar's `Size` field adds a fourth unit. The chain for a nominal 2000 edge:
+The naming grammar's two size fields, `Thickness` and `Length`, add a fourth unit. The chain for
+a nominal 2000 edge:
 
 ```
-Size token   2000        (millimetres — a label, never used in math)
+Length token 2000        (millimetres — a label, never used in math)
 Blender      2.0 m
 FBX          200.0       (centimetres)
 Unreal       200.0 uu
 ```
+
+`Thickness` runs down the same chain: the 40 mm calibration panel is 0.04 m in Blender and 4.0 uu
+in Unreal. Unlike `Length` it is never measured back off the asset (README §2.2), so the token is
+the only place the number is recorded.
 
 Default Blender scene settings with default export and import settings (§4, §5) put exactly
 **one** scaling step in that chain: Blender's export, converting metres to FBX's centimetres.
 Nothing else may scale. A panel that imports 100× too small or too large means a second
 conversion is switched on somewhere; §7's first check confirms this once.
 
-`Size` is compared for equality and nothing else (README §2.2). The one place these units are
+Both size tokens are compared for equality and nothing else (README §2.2). The one place these units are
 related is the import-time validator (§6).
 
 ---
@@ -183,10 +188,11 @@ frame turns the warning off (§6); nothing at runtime consults it.
 The **object name** in the outliner becomes the FBX node name, and therefore the socket name —
 not the data name, not a custom property.
 
-Follow README §2.2 exactly: `SOCKET_Edge_001_Straight_2000`. Because Blender object names are
+Follow README §2.2 exactly: `SOCKET_Edge_001_Straight_40_2000` — the last two fields are the
+edge's length and the panel's thickness, both in millimetres. Because Blender object names are
 unique per *file*, a socket may also carry an **authoring tail** — anything from a `.` onward,
 which the parser ignores. The importer **rewrites that `.` to `_`** (§5), so the tail reaches
-Unreal as a fifth field rather than verbatim, and that fifth field is the only spelling the
+Unreal as a sixth field rather than verbatim, and that sixth field is the only spelling the
 parser knows. Prefer a meaningful one (`.Pent`) over letting
 Blender assign `.001`; the validator warns about the numeric kind (§6).
 
@@ -265,9 +271,9 @@ Two consequences of the defaults are worth naming:
 Unreal creates static mesh sockets from FBX nodes prefixed `SOCKET_`, stripping the prefix
 (README §2.2). The node must be an FBX null, which is what a parented Blender empty produces.
 **Interchange rewrites the authoring tail's `.` to `_`.** Confirmed on the calibration asset
-(§7 check 5): `SOCKET_Edge_004_Straight_2000.Pent` imports as `Edge_004_Straight_2000_Pent`. The
-parser splits on the fifth field alone and never looks for the `.`, which the head's fixed arity
-of four fields makes unambiguous (README §2.2). Nothing needs to change in the export; the `.` is
+(§7 check 5): `SOCKET_Edge_004_Straight_40_2000.Pent` imports as
+`Edge_004_Straight_40_2000_Pent`. The parser splits on the sixth field alone and never looks for
+the `.`, which the head's fixed arity of five fields makes unambiguous (README §2.2). Nothing needs to change in the export; the `.` is
 still the right thing to author — it just does not survive the trip.
 
 ---
@@ -288,10 +294,14 @@ Two hard checks, and they are deliberately few:
 | Check | Catches |
 | --- | --- |
 | The socket's rotation matrix is orthonormal with determinant +1, and socket scale ≈ 1 | A scaled, sheared, or mirrored empty. Read the **raw matrix**, not `GetUnitAxis` — that accessor goes through `TransformVectorNoScale`, so a check written on its output is orthonormal by construction and can never fail. |
-| `EdgeLength_uu * 10` is within **1%** of `Size_mm` | A wrong export scale. |
+| `EdgeLength_uu * 10` is within **1%** of `Length_mm` | A wrong export scale. |
+
+`Thickness` gets no row: a socket transform carries a point and a basis, not a cross-section, so
+there is nothing to measure it against (README §2.2). It is checked as a token by the parser and
+no further.
 
 The scale check is the one that earns its keep, though not for the reason it looks like. Its
-value is catching a 100× unit error on asset one rather than 40 assets later; `Size` is simply
+value is catching a 100× unit error on asset one rather than 40 assets later; `Length` is simply
 the free oracle that makes such a check possible at all, since the name states an intended
 length. It is **not** a label check — a percentage tolerance is deliberate, because a panel
 mislabelled by a millimetre or two announces itself the first time it refuses to snap, which is
@@ -347,8 +357,9 @@ Specified exactly, so every check below has a number to compare against rather t
 impression:
 
 > A **square panel, 2000 × 2000 × 40 mm**, centred on the Blender origin and lying in the XY
-> plane. One empty named `SOCKET_Edge_001_Straight_2000`, placed at Blender **`(1.0, 0, 0)`** —
-> the midpoint of the +X edge — with **zero rotation**.
+> plane. One empty named `SOCKET_Edge_001_Straight_40_2000`, placed at Blender **`(1.0, 0, 0)`**
+> — the midpoint of the +X edge — with **zero rotation**. The trailing `40` is the panel's
+> thickness in millimetres, taken from the 40 mm in the line above.
 
 Zero rotation is the point of the design: §2's Blender column makes an unrotated empty a correct
 socket for the +X edge, so anything the socket shows in Unreal other than what check 3 states
@@ -368,9 +379,10 @@ came from the pipeline and nothing else. Author per §3, export per §4, import 
    read as one flush 2 × 4 m rectangle with no step, gap, or overlap at the join. Any visible
    seam artefact here is an axis or scale error, not a snapping bug; there is no snapping yet.
    Re-run it as milestone 1's first test once the snapper exists.
-5. **Authoring tail.** Re-export with the socket renamed `SOCKET_Edge_001_Straight_2000.Pent`.
-   It imports as `Edge_001_Straight_2000_Pent` — the importer **rewrites the `.` to `_`** rather
-   than preserving or swallowing it — and still parses to ID `001` (README §2.2). Confirmed.
+5. **Authoring tail.** Re-export with the socket renamed `SOCKET_Edge_001_Straight_40_2000.Pent`.
+   It imports as `Edge_001_Straight_40_2000_Pent` — the importer **rewrites the `.` to `_`**
+   rather than preserving or swallowing it — and still parses to ID `001` (README §2.2).
+   Confirmed.
 6. **Foreign socket.** Add a second empty named `SOCKET_Mount_A` and re-export. It imports as a
    socket, and PolySnap ignores it without a diagnostic (README §2.2). Confirms the plugin can
    share a mesh with another system, which is the whole basis for equipment living elsewhere.

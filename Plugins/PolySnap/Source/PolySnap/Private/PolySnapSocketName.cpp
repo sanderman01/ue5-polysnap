@@ -9,8 +9,8 @@ constexpr int32 IdDigitCount = 3;
 constexpr int32 MinId = 1;
 constexpr int32 MaxId = 999;
 
-/** Fields in the head of a well-formed Straight socket: Edge, ID, SubType, Size. */
-constexpr int32 StraightFieldCount = 4;
+/** Fields in the head of a well-formed Straight socket: Edge, ID, SubType, Thickness, Length. */
+constexpr int32 StraightFieldCount = 5;
 
 [[nodiscard]] bool IsAllDigits(FStringView Token)
 {
@@ -52,6 +52,45 @@ void SetError(FString* OutError, FStringView SocketName, const FString& Reason)
 		*OutError = FString::Printf(TEXT("Socket '%.*s': %s"), SocketName.Len(), SocketName.GetData(), *Reason);
 	}
 }
+
+/**
+	 * Reads one millimetre token: a bare positive integer, never zero-padded.
+	 *
+	 * Thickness and Length have identical rules, so they share this. FieldName is what puts the
+	 * right word in the diagnostic -- with two size fields in the grammar, "size" no longer says
+	 * which of them the author mistyped.
+	 *
+	 * Unpadded is a rule rather than a tolerance: one size, one spelling, so that 500 and 12000
+	 * can coexist without a fixed width inviting a four-digit assumption.
+	 */
+[[nodiscard]] bool ParseMillimetreToken(FStringView Token, const TCHAR* FieldName, FStringView SocketName,
+	int32& OutValue, FString* OutError)
+{
+	if (!IsAllDigits(Token))
+	{
+		SetError(OutError, SocketName,
+			FString::Printf(TEXT("%s '%.*s' must be a bare integer in millimetres"), FieldName, Token.Len(),
+				Token.GetData()));
+		return false;
+	}
+
+	if (Token.Len() > 1 && Token[0] == TEXT('0'))
+	{
+		SetError(OutError, SocketName,
+			FString::Printf(TEXT("%s '%.*s' is zero-padded; write 500, never 0500"), FieldName, Token.Len(),
+				Token.GetData()));
+		return false;
+	}
+
+	OutValue = ToInt(Token);
+	if (OutValue <= 0)
+	{
+		SetError(OutError, SocketName, FString::Printf(TEXT("%s must be greater than zero"), FieldName));
+		return false;
+	}
+
+	return true;
+}
 } // namespace PolySnapSocketNamePrivate
 
 void FPolySnapSocketName::SplitAuthoringTail(FStringView SocketName, FStringView& OutHead, FStringView& OutTail)
@@ -59,7 +98,7 @@ void FPolySnapSocketName::SplitAuthoringTail(FStringView SocketName, FStringView
 	using namespace PolySnapSocketNamePrivate;
 
 	// Import rewrites the authored '.' to '_', so by the time a name reaches this parser the tail
-	// is just a fifth underscore-separated field. There is no separator left to distinguish it by;
+	// is just a sixth underscore-separated field. There is no separator left to distinguish it by;
 	// the head's fixed arity is the whole of the rule, and is why the grammar puts the variable
 	// part last rather than letting the head grow.
 	int32 Remaining = StraightFieldCount;
@@ -150,14 +189,15 @@ EPolySnapParseResult FPolySnapSocketName::Parse(FStringView SocketName, FPolySna
 	if (Fields.Num() != StraightFieldCount)
 	{
 		SetError(OutError, SocketName,
-			FString::Printf(TEXT("expected %d underscore-separated fields (Edge_<ID>_<SubType>_<Size>), found %d"),
+			FString::Printf(TEXT("expected %d underscore-separated fields (Edge_<ID>_<SubType>_<Thickness>_<Length>), found %d"),
 				StraightFieldCount, Fields.Num()));
 		return EPolySnapParseResult::Malformed;
 	}
 
 	const FStringView IdToken = Fields[1];
 	const FStringView SubTypeToken = Fields[2];
-	const FStringView SizeToken = Fields[3];
+	const FStringView ThicknessToken = Fields[3];
+	const FStringView LengthToken = Fields[4];
 
 	// ID is padded to three digits so that Blender's outliner and Unreal's socket manager, which
 	// both sort alphabetically, put 002 before 010.
@@ -185,35 +225,32 @@ EPolySnapParseResult FPolySnapSocketName::Parse(FStringView SocketName, FPolySna
 		return EPolySnapParseResult::Malformed;
 	}
 
-	// Size is unpadded on purpose: one size, one spelling, so Straight_500 and Straight_12000 can
-	// coexist without a fixed width inviting a four-digit assumption.
-	if (!IsAllDigits(SizeToken))
+	// Both size fields are millimetre tokens on identical terms, so they share one reader, and they
+	// are read in the order they are written. Thickness is the panel across the edge; Length is the
+	// edge itself, and the pair is what makes two edges of equal length but unequal thickness -- a
+	// stepped seam -- incompatible rather than merely ugly.
+	//
+	// Thickness comes first because it is the field every subtype has. Length is Straight's shape
+	// parameter, and a curved subtype would replace it with two of its own; keeping the
+	// subtype-specific parameters last is what lets that happen without moving anything ahead of
+	// them.
+	int32 ThicknessMillimetres = 0;
+	if (!ParseMillimetreToken(ThicknessToken, TEXT("thickness"), SocketName, ThicknessMillimetres, OutError))
 	{
-		SetError(OutError, SocketName,
-			FString::Printf(TEXT("size '%.*s' must be a bare integer in millimetres"), SizeToken.Len(),
-				SizeToken.GetData()));
 		return EPolySnapParseResult::Malformed;
 	}
 
-	if (SizeToken.Len() > 1 && SizeToken[0] == TEXT('0'))
+	int32 LengthMillimetres = 0;
+	if (!ParseMillimetreToken(LengthToken, TEXT("length"), SocketName, LengthMillimetres, OutError))
 	{
-		SetError(OutError, SocketName,
-			FString::Printf(TEXT("size '%.*s' is zero-padded; write Straight_500, never Straight_0500"),
-				SizeToken.Len(), SizeToken.GetData()));
-		return EPolySnapParseResult::Malformed;
-	}
-
-	const int32 SizeMillimetres = ToInt(SizeToken);
-	if (SizeMillimetres <= 0)
-	{
-		SetError(OutError, SocketName, TEXT("size must be greater than zero"));
 		return EPolySnapParseResult::Malformed;
 	}
 
 	OutDescriptor.SocketName = FName(SocketName);
 	OutDescriptor.Id = Id;
 	OutDescriptor.SubType = SubType;
-	OutDescriptor.SizeMillimetres = SizeMillimetres;
+	OutDescriptor.ThicknessMillimetres = ThicknessMillimetres;
+	OutDescriptor.LengthMillimetres = LengthMillimetres;
 
 	return EPolySnapParseResult::Parsed;
 }

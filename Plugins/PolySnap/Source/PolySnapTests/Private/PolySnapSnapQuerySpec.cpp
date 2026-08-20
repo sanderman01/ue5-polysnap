@@ -13,14 +13,26 @@ BEGIN_DEFINE_SPEC(FPolySnapSnapQuerySpec, "PolySnap.SnapQuery",
 /** Half of the calibration panel's 2000 mm edge, in Unreal units. */
 static constexpr double HalfPanelUu = 100.0;
 
-/** A world socket with no piece behind it, which is all the pure query needs. */
-static FPolySnapWorldSocket MakeSocket(int32 Id, int32 SizeMillimetres, const FTransform& WorldTransform)
+/** The calibration panel's thickness, in millimetres. Only the tests about it pass anything else. */
+static constexpr int32 PanelThicknessMm = 40;
+
+/**
+ * A world socket with no piece behind it, which is all the pure query needs.
+ *
+ * Thickness is defaulted because almost every test here is about geometry rather than
+ * compatibility, and spelling the same 40 at every call site would bury the two cases that
+ * actually vary it.
+ */
+static FPolySnapWorldSocket MakeSocket(int32 Id, int32 LengthMillimetres, const FTransform& WorldTransform,
+	int32 ThicknessMillimetres = PanelThicknessMm)
 {
 	FPolySnapWorldSocket Socket;
-	Socket.Descriptor.SocketName = FName(*FString::Printf(TEXT("Edge_%03d_Straight_%d"), Id, SizeMillimetres));
+	Socket.Descriptor.SocketName =
+		FName(*FString::Printf(TEXT("Edge_%03d_Straight_%d_%d"), Id, ThicknessMillimetres, LengthMillimetres));
 	Socket.Descriptor.Id = Id;
 	Socket.Descriptor.SubType = EPolySnapEdgeSubType::Straight;
-	Socket.Descriptor.SizeMillimetres = SizeMillimetres;
+	Socket.Descriptor.ThicknessMillimetres = ThicknessMillimetres;
+	Socket.Descriptor.LengthMillimetres = LengthMillimetres;
 	Socket.WorldTransform = WorldTransform;
 
 	return Socket;
@@ -46,13 +58,29 @@ void FPolySnapSnapQuerySpec::Define()
 	Describe("testing one socket pair",
 		[this, Tolerances]()
 		{
-			It("rejects an incompatible size before anything geometric runs",
+			It("rejects an incompatible length before anything geometric runs",
 				[this, Tolerances]()
 				{
 					// Cheap integer comparison, so it goes first. Two sockets in exactly the same place
-					// still do not mate if their sizes differ.
+					// still do not mate if their lengths differ.
 					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity);
 					const FPolySnapWorldSocket Target = MakeSocket(1, 3464, FTransform::Identity);
+
+					FPolySnapCandidate Candidate;
+					TestEqual("reason",
+						RejectionName(FPolySnapSnapQuery::TestPair(Held, Target, Tolerances, Candidate)),
+						RejectionName(EPolySnapRejection::Incompatible));
+				});
+
+			It("rejects an incompatible thickness even when the lengths agree",
+				[this, Tolerances]()
+				{
+					// A thin partition against a thick hull panel: same edge length, so the geometry
+					// would mate happily, and the seam it produces is stepped rather than flush. The
+					// thickness token is the only thing that knows, since no socket transform carries
+					// a cross-section.
+					const FPolySnapWorldSocket Held = MakeSocket(1, 2000, FTransform::Identity, 40);
+					const FPolySnapWorldSocket Target = MakeSocket(1, 2000, FTransform::Identity, 100);
 
 					FPolySnapCandidate Candidate;
 					TestEqual("reason",
