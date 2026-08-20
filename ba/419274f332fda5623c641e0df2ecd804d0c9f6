@@ -1,0 +1,31 @@
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapSettings.cpp
+  s_6b72366be34080::t_35529a4cdb56de 23-42
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapSettings.h
+  s_6b72366be34080::t_35ebd804314112 11-16
+  s_6b72366be34080::t_b2fd33c225e3e7 43-51,111-115,118,121-140
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapPiece.cpp
+  s_6b72366be34080::t_98402964638deb 37-38,84
+  s_6b72366be34080::t_9897cf3bfe3fbc 6-7,32-36,39-49,62-83
+Config/DefaultPolySnap.ini
+  s_6b72366be34080::t_b5420258b7766b 5-8
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapPiece.h
+  s_6b72366be34080::t_0f260d416e577d 30
+  s_6b72366be34080::t_e9b9517de37b6b 56-62,65-68
+  s_6b72366be34080::t_5a9b06ba8e358a 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "ba419274f332fda5623c641e0df2ecd804d0c9f6",
+  "prompts": {},
+  "sessions": {
+    "s_6b72366be34080": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e375de3c-058e-417b-989b-b993921075c7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
