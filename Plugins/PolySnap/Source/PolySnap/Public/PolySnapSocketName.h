@@ -19,7 +19,7 @@ enum class EPolySnapParseResult : uint8
 };
 
 /**
- * The socket naming grammar of README section 2.2:
+ * The socket naming grammar of DESIGN section 2.2:
  *
  *     SOCKET_Edge_<ID>_<SubType>_<Thickness>_<Length>[.<AuthoringTail>]    as authored
  *     Edge_001_Straight_40_2000_Pent                                       as imported
@@ -60,7 +60,7 @@ public:
 	/**
 	 * Parses one socket name into its fields.
 	 *
-	 * The three-way result is the point. README section 2.2 requires that a socket which is not
+	 * The three-way result is the point. DESIGN section 2.2 requires that a socket which is not
 	 * PolySnap's is passed over without a diagnostic, while one that is PolySnap's and malformed
 	 * fails loudly -- Edge_01_Straight_40_2000 is a typo, not a foreign socket. A bool cannot
 	 * express that difference.

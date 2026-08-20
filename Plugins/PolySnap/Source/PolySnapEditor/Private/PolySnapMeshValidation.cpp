@@ -155,7 +155,7 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 
 		// Neither size token is checked against the mesh. They carry no unit and are never read as
 		// numbers -- the only thing either one is for is equality against the matching field on
-		// another socket (README section 2.2) -- so there is no measurement for a check to compare
+		// another socket (DESIGN section 2.2) -- so there is no measurement for a check to compare
 		// them to.
 
 		// -- Warnings, each behind its own switch ------------------------------------------

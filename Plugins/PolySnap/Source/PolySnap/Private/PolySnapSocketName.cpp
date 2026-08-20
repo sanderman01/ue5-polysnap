@@ -58,7 +58,7 @@ void SetError(FString* OutError, FStringView SocketName, const FString& Reason)
 	 *
 	 * The token carries no unit and is never read as a number. "40", "40mm", "4cm" and "Thin" are
 	 * equally legal, because the only thing done with the value is compare it for equality against
-	 * the matching field on another socket (README section 2.2). A project chooses a vocabulary;
+	 * the matching field on another socket (DESIGN section 2.2). A project chooses a vocabulary;
 	 * PolySnap only insists that both ends of a joint spell it the same way.
 	 *
 	 * Letters and digits only is what keeps the structural diagnostics sharp. It is the rule that

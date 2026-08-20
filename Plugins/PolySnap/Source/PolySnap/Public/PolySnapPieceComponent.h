@@ -98,7 +98,7 @@ public:
 	[[nodiscard]] const FPolySnapSocketDescriptor* FindDescriptorById(int32 SocketId) const;
 
 private:
-	/** Parsed once at BeginPlay and never re-parsed. README section 2.2 is explicit about this. */
+	/** Parsed once at BeginPlay and never re-parsed. DESIGN section 2.2 is explicit about this. */
 	TArray<FPolySnapSocketDescriptor> SocketDescriptors;
 
 	/** One record per participating socket, mirroring what persistence will store. */

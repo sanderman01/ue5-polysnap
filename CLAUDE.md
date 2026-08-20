@@ -7,7 +7,8 @@ Where the two overlap, this file wins.
 
 | Document | Covers |
 | --- | --- |
-| [README.md](README.md) | The design: what the game is, how the PolySnap node-based snapping system works, which questions are still open. Read it before doing design work. |
+| [README.md](README.md) | The overview: what the game is and how the PolySnap node-based snapping system works in outline. |
+| [DESIGN.md](DESIGN.md) | The design record: every decision, its reasoning, and which questions are still open. Read it before doing design work. |
 | [CONVENTIONS.md](CONVENTIONS.md) | The Blender↔Unreal contract: axes, units, socket basis, exact import/export settings. |
 | [CODE_STYLE.md](CODE_STYLE.md) | How the C++ is written: Epic's standard, modern C++, lifetime rules, Blueprint API hygiene. Read it before writing code. |
 | `unreal-build` skill | Building a target, the editor guard, regenerating project files. |

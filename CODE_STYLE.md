@@ -1,8 +1,9 @@
 # Code style
 
-Companion to [README.md](README.md) and [CONVENTIONS.md](CONVENTIONS.md). The README describes
-*what* we are building; CONVENTIONS.md pins down the asset-pipeline conventions shared between
-Blender and Unreal; this file governs the C++ we write.
+Companion to [README.md](README.md), [DESIGN.md](DESIGN.md) and
+[CONVENTIONS.md](CONVENTIONS.md). The README describes *what* we are building and DESIGN.md *why*;
+CONVENTIONS.md pins down the asset-pipeline conventions shared between Blender and Unreal; this
+file governs the C++ we write.
 
 Applies to every module in the project — plugins and the `Sandbox` game module alike.
 

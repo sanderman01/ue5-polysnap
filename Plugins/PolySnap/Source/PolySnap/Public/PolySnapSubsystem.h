@@ -14,7 +14,7 @@ class UPolySnapPieceComponent;
 /**
  * The world's registry of PolySnap pieces, and the one place the global debug pass runs from.
  *
- * README section 2.8 says the assembly graph should be maintained incrementally rather than
+ * DESIGN section 2.8 says the assembly graph should be maintained incrementally rather than
  * rebuilt by scanning the world; this registry is where that graph will live once Milestone 3
  * builds it. For now it does the smaller job of answering "which sockets are near enough to be
  * worth testing".

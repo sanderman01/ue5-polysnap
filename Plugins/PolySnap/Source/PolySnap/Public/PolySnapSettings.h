@@ -15,7 +15,7 @@
  * them locally and the plugin keeps carrying its own. CONVENTIONS.md section 6 requires this of
  * the validator switches in particular.
  *
- * README section 7 lists tolerances as an open question -- whether they are global, per socket
+ * DESIGN section 7 lists tolerances as an open question -- whether they are global, per socket
  * type, or scaled by piece size is unexplored. Everything here is global, which is the simplest
  * thing that can work and the thing to revisit first.
  */
@@ -54,7 +54,7 @@ public:
 
 	/**
 	 * How far from collinear the two tangent lines may be. Polarity is ignored here: the test is
-	 * on the lines, and both polarities are admissible (README section 2.3).
+	 * on the lines, and both polarities are admissible (DESIGN section 2.3).
 	 */
 	UPROPERTY(config, EditAnywhere, Category = "Snapping",
 		meta = (ClampMin = "0.1", ClampMax = "89.0", ForceUnits = "deg"))

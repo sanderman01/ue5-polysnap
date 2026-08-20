@@ -62,7 +62,7 @@ public:
 	 * Draws the shared edge line of a committed connection, with the dihedral it settled at.
 	 *
 	 * The line marks the hinge axis at a fixed gizmo size; it is not the edge's true extent.
-	 * Nothing knows that extent -- the Length token is an opaque label with no unit (README
+	 * Nothing knows that extent -- the Length token is an opaque label with no unit (DESIGN
 	 * section 2.2), and the mesh is not measured at runtime.
 	 */
 	static void DrawCommittedJoint(const UWorld* World, const FTransform& JointTransform, double DihedralDegrees);

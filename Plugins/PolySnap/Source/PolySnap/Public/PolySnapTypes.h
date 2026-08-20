@@ -9,7 +9,7 @@
 class UPolySnapPieceComponent;
 
 /**
- * Edge geometry of a socket, the first of the three compatibility terms (README section 2.2).
+ * Edge geometry of a socket, the first of the three compatibility terms (DESIGN section 2.2).
  *
  * It is also what fixes the arity of the fields after it: Length is Straight's one shape
  * parameter, and a curved subtype would replace it with a radius and an arc length. That is why
@@ -59,7 +59,7 @@ struct POLYSNAP_API FPolySnapSocketDescriptor
 	 *
 	 * PolySnap never interprets it: no unit is implied, no arithmetic is ever done on it, and the
 	 * only operation is equality against another socket's token. "40", "40mm", "4cm" and "Thin"
-	 * are all legal and all distinct; a project picks one vocabulary and holds it. See README
+	 * are all legal and all distinct; a project picks one vocabulary and holds it. See DESIGN
 	 * section 2.2.
 	 *
 	 * Declared before Length to match the naming grammar, where thickness precedes the subtype's
@@ -80,7 +80,7 @@ struct POLYSNAP_API FPolySnapSocketDescriptor
 	[[nodiscard]] bool IsValid() const { return Id > 0 && !Thickness.IsNone() && !Length.IsNone(); }
 
 	/**
-	 * README section 2.2: two sockets may connect only when SubType, Thickness and Length all
+	 * DESIGN section 2.2: two sockets may connect only when SubType, Thickness and Length all
 	 * match. The ID never participates -- it is identity, not classification.
 	 *
 	 * FName equality is an interned-index compare, so this stays the cheapest test in the query,
@@ -177,7 +177,7 @@ struct POLYSNAP_API FPolySnapSocketAxes
 [[nodiscard]] POLYSNAP_API const TCHAR* PolySnapAxisToString(EPolySnapSocketAxis Axis);
 
 /**
- * The orthonormal basis a socket defines (README section 2.3), resolved from a socket transform.
+ * The orthonormal basis a socket defines (DESIGN section 2.3), resolved from a socket transform.
  *
  * Which local axis carries which role is fixed in CONVENTIONS.md section 2. Note Tangent: it is
  * the socket's negative Y, because converting a right-handed Blender basis into Unreal's
@@ -199,7 +199,7 @@ struct POLYSNAP_API FPolySnapSocketBasis
 };
 
 /**
- * Which way round the two panels' normals end up (README section 2.3). The mating condition
+ * Which way round the two panels' normals end up (DESIGN section 2.3). The mating condition
  * leaves the tangent sign free, and both values are always admissible -- a flip is a proper
  * 180 degree rotation about the socket's Outward axis, a motion the player can physically
  * perform, not a mirror image.
@@ -247,7 +247,7 @@ enum class EPolySnapRejection : uint8
 };
 
 /**
- * A socket pair that passed every test in README section 2.5, together with the placement it
+ * A socket pair that passed every test in DESIGN section 2.5, together with the placement it
  * implies. Exactly one candidate becomes the anchor, and the piece's transform is solved from
  * the anchor and from nothing else.
  */
@@ -286,7 +286,7 @@ struct POLYSNAP_API FPolySnapCandidate
 /**
  * One socket's participation in a connection, recorded on the piece that owns the socket.
  *
- * Milestone 1 records connections directly between pieces. README section 2.4's first-class
+ * Milestone 1 records connections directly between pieces. DESIGN section 2.4's first-class
  * Joint -- a shared edge line hosting two or more sockets -- arrives with the assembly graph in
  * Milestone 3, and this struct is what it will grow out of.
  */

@@ -84,7 +84,7 @@ void FPolySnapSocketNameSpec::Define()
 				[this]()
 				{
 					// Nothing reads these tokens as numbers, so an abstract vocabulary is as valid
-					// as a dimensioned one. README section 2.2.
+					// as a dimensioned one. DESIGN section 2.2.
 					TestEqual("result", ParseName(TEXT("Edge_001_Straight_Hull_Long")), TEXT("Parsed"));
 					TestEqual("thickness", Descriptor.Thickness.ToString(), TEXT("Hull"));
 					TestEqual("length", Descriptor.Length.ToString(), TEXT("Long"));

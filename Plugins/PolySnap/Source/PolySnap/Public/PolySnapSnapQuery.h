@@ -31,7 +31,7 @@ struct POLYSNAP_API FPolySnapRejectedPair
 };
 
 /**
- * README section 2.5's candidate evaluation, and the choice of which passing pair anchors.
+ * DESIGN section 2.5's candidate evaluation, and the choice of which passing pair anchors.
  *
  * Pure: it takes two arrays of world sockets and returns a candidate. The world, the actors and
  * the settings object all stay on the caller's side of this line.
@@ -59,7 +59,7 @@ public:
 	 *     cost = Gap / SnapDistance + RequiredRotation / TangentAngleTolerance
 	 *
 	 * -- each term normalised by its own tolerance, so the score is dimensionless and introduces
-	 * no tuning number that is not already a documented tolerance. README section 7 lists anchor
+	 * no tuning number that is not already a documented tolerance. DESIGN section 7 lists anchor
 	 * selection as unexplored; this is the placeholder, and the residual it leaves is the thing
 	 * Milestone 2 measures.
 	 *
@@ -78,7 +78,7 @@ public:
 
 private:
 	/**
-	 * README section 2.4: socket occupancy is a capacity question, not a boolean -- "is this
+	 * DESIGN section 2.4: socket occupancy is a capacity question, not a boolean -- "is this
 	 * socket taken?" becomes "does this joint accept another participant?", and by default it
 	 * does. Milestone 1 has no first-class joint, so this always passes; it exists as a call so
 	 * Milestone 3's assembly graph has somewhere to put the real test.

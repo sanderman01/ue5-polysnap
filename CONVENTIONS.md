@@ -1,8 +1,9 @@
 # Conventions
 
-Companion to [README.md](README.md). The README describes *what* we are building and *why*; this
-file pins down the mechanical conventions — coordinate systems, which local axis carries which
-meaning, and the Blender and Unreal settings that keep the two agreeing.
+Companion to [README.md](README.md) and [DESIGN.md](DESIGN.md). The README describes *what* we
+are building and DESIGN.md *why*; this file pins down the mechanical conventions — coordinate
+systems, which local axis carries which meaning, and the Blender and Unreal settings that keep the
+two agreeing.
 
 Most of this is **fixed**: once panels are authored at volume, changing it means re-exporting
 every asset. The few rules that are house style rather than requirement are marked as optional
@@ -34,7 +35,7 @@ place that error is caught.
 
 **The naming grammar's two size fields are not part of this chain.** `Thickness` and `Length` are
 opaque tokens with no unit at all — compared for equality and nothing else, never converted, never
-measured back off the asset (README §2.2). A project may spell them `40`/`2000`, `4cm`/`2m` or
+measured back off the asset (DESIGN §2.2). A project may spell them `40`/`2000`, `4cm`/`2m` or
 `Hull`/`Long`; this document's examples use the first because the calibration panel is quoted in
 millimetres, not because the grammar knows what a millimetre is.
 
@@ -42,14 +43,14 @@ millimetres, not because the grammar knows what a millimetre is.
 
 ## 2. The socket basis
 
-The load-bearing convention. README §2.3 names the three directions; here is which axis each
+The load-bearing convention. DESIGN §2.3 names the three directions; here is which axis each
 one *is*.
 
 | Role | Blender empty local | Unreal socket local | Meaning |
 | --- | --- | --- | --- |
 | **Outward** | **+X** | **+X** (Forward) | In the panel plane, perpendicular to the edge, away from the piece's centre. |
 | **Tangent** | **+Y** | **−Y** | Along the edge. |
-| **Normal** | **+Z** | **+Z** (Up) | The panel's surface normal. Arbitrary which face; see README §2.6. |
+| **Normal** | **+Z** | **+Z** (Up) | The panel's surface normal. Arbitrary which face; see DESIGN §2.6. |
 
 **The Blender column is chosen for ease of authoring.** An empty with zero rotation is already
 a valid socket on the piece's +X edge, so authoring a socket is "place it, then yaw about Z"
@@ -85,13 +86,13 @@ scale — there is no single scale to drop, and a mirror flips the handedness th
 depends on. §6 checks for exactly that.
 
 Do not read this as licence to scale a *piece*. That rule is the opposite one and unchanged
-(README §2.2): a placed piece is never scaled, because a panel at 1.5× has edges that no longer
+(DESIGN §2.2): a placed piece is never scaled, because a panel at 1.5× has edges that no longer
 match the size tokens naming them. A socket's scale describes nothing, so it can say nothing
 false; a piece's scale describes the edges, so it can.
 
 **Outward is the vector that sweeps as the dihedral changes**: at 180° (coplanar)
 `Outward_B == -Outward_A`, and folding rotates the two toward each other about the shared
-tangent. README §2.3 defines the angle itself — signed, over [0°, 360°), in the anchor socket's
+tangent. DESIGN §2.3 defines the angle itself — signed, over [0°, 360°), in the anchor socket's
 basis. Both branches away from 180° are real folds; the sign only says which side of the anchor
 panel's plane the other landed on, and means nothing about inside or outside.
 
@@ -158,12 +159,12 @@ as a strut runs its long axis along +X.
 
 ### The origin
 
-- **Centroid, in-plane.** README §2.3 defines Outward relative to "the piece's centre", so the
+- **Centroid, in-plane.** DESIGN §2.3 defines Outward relative to "the piece's centre", so the
   origin should *be* that centre. It also makes a held piece tumble about itself.
 - **Mid-thickness, never on a face.** Put `Z = 0` at the mid-surface and keep the panel symmetric
   about that mid-plane wherever the design allows.
 
-Mid-thickness is the rule with teeth. Flipping (README §2.3) is a 180° rotation about a socket's
+Mid-thickness is the rule with teeth. Flipping (DESIGN §2.3) is a 180° rotation about a socket's
 Outward axis; with sockets at mid-thickness on a symmetric panel it maps the panel onto itself,
 so the hull surface stays put and only which face things are mounted on changes — exactly what
 §2.3 says flipping should do. With the origin on a face, **every flip displaces the panel by its
@@ -198,7 +199,7 @@ frame turns the warning off (§6); nothing at runtime consults it.
 The **object name** in the outliner becomes the FBX node name, and therefore the socket name —
 not the data name, not a custom property.
 
-Follow README §2.2 exactly: `SOCKET_Edge_001_Straight_40_2000` — the last two fields are the
+Follow DESIGN §2.2 exactly: `SOCKET_Edge_001_Straight_40_2000` — the last two fields are the
 panel's thickness and then the edge's length, in that order, and in whatever vocabulary this
 project has settled on (here, millimetres unadorned). Because Blender object names are
 unique per *file*, a socket may also carry an **authoring tail** — anything from a `.` onward,
@@ -276,29 +277,29 @@ Two consequences of the defaults are worth naming:
   when every piece is authored at identity, and the reason §3 insists on it rather than merely
   recommending it.
 - **Auto-generated collision is the one thing to switch off** per asset. Panels need authored
-  collision; a generated hull will not respect an edge profile (README §2.4). That is a content
+  collision; a generated hull will not respect an edge profile (DESIGN §2.4). That is a content
   decision, not a change to the pipeline.
 
 Unreal creates static mesh sockets from FBX nodes prefixed `SOCKET_`, stripping the prefix
-(README §2.2). The node must be an FBX null, which is what a parented Blender empty produces.
+(DESIGN §2.2). The node must be an FBX null, which is what a parented Blender empty produces.
 **Interchange rewrites the authoring tail's `.` to `_`.** Confirmed on the calibration asset
 (§7 check 5): `SOCKET_Edge_004_Straight_40_2000.Pent` imports as
 `Edge_004_Straight_40_2000_Pent`. The parser splits on the sixth field alone and never looks for
-the `.`, which the head's fixed arity of five fields makes unambiguous (README §2.2). Nothing needs to change in the export; the `.` is
+the `.`, which the head's fixed arity of five fields makes unambiguous (DESIGN §2.2). Nothing needs to change in the export; the `.` is
 still the right thing to author — it just does not survive the trip.
 
 ---
 
 ## 6. What the validator enforces
 
-PolySnap's editor module parses socket names at import (README §2.2). With the basis convention
+PolySnap's editor module parses socket names at import (DESIGN §2.2). With the basis convention
 fixed it can also check geometry against the name, which is where mistakes in this document's
 settings actually surface — at import, never as a runtime surprise.
 
 Name parsing has one ordering rule worth repeating here: **strip the authoring tail before
 checking ID uniqueness.** The other way round, two pieces sharing a `.blend` fail for an error
 neither of them has. Sockets not named `Edge_*` belong to some other system and are skipped
-without a diagnostic (README §2.2).
+without a diagnostic (DESIGN §2.2).
 
 One hard check, and it is deliberately alone:
 
@@ -309,7 +310,7 @@ One hard check, and it is deliberately alone:
 Neither size field gets a row. `Thickness` never could: a socket transform carries a point and a
 basis, not a cross-section, so there is nothing to measure it against. `Length` no longer can
 either — the token states no unit, so a measured edge in Unreal units has nothing to be compared
-to. Both are checked as tokens by the parser, and no further (README §2.2).
+to. Both are checked as tokens by the parser, and no further (DESIGN §2.2).
 
 An earlier version of this document had a second hard check here: `EdgeLength_uu * 10` within 1%
 of `Length_mm`, catching a wrong export scale. Its value was never really label-checking — it was
@@ -344,9 +345,9 @@ the project's assets mostly come from.
 Two mesh-inspecting checks were considered and dropped, because they cost the most and catch the
 least: **"Tangent is parallel to a real mesh edge at that position"** and **"the socket sits at
 that edge's midpoint."** Neither survives a chamfered or profiled edge, where there is no single
-mesh edge under the socket to compare against — and profiled edges are exactly what README §2.4
+mesh edge under the socket to compare against — and profiled edges are exactly what DESIGN §2.4
 relies on for its mechanical fold limit. The midpoint check also pre-answers the collinear
-subdivision question (README §7), which may yet want sockets somewhere other than the midpoint.
+subdivision question (DESIGN §7), which may yet want sockets somewhere other than the midpoint.
 
 What they were buying — swapped axis roles — is covered twice over: by the inward-Outward
 warning above, and by §7's calibration, which catches an axis-role error once, visually, before
@@ -371,7 +372,7 @@ impression:
 > plane. One empty named `SOCKET_Edge_001_Straight_40_2000`, placed at Blender **`(1.0, 0, 0)`**
 > — the midpoint of the +X edge — with **zero rotation**. The `40` and `2000` are size *tokens*,
 > not measurements: they read as the panel's millimetres because that is the vocabulary this
-> project uses, and nothing in the grammar or the validator interprets them (README §2.2).
+> project uses, and nothing in the grammar or the validator interprets them (DESIGN §2.2).
 
 Zero rotation is the point of the design: §2's Blender column makes an unrotated empty a correct
 socket for the +X edge, so anything the socket shows in Unreal other than what check 3 states
@@ -395,10 +396,10 @@ came from the pipeline and nothing else. Author per §3, export per §4, import 
    Re-run it as milestone 1's first test once the snapper exists.
 5. **Authoring tail.** Re-export with the socket renamed `SOCKET_Edge_001_Straight_40_2000.Pent`.
    It imports as `Edge_001_Straight_40_2000_Pent` — the importer **rewrites the `.` to `_`**
-   rather than preserving or swallowing it — and still parses to ID `001` (README §2.2).
+   rather than preserving or swallowing it — and still parses to ID `001` (DESIGN §2.2).
    Confirmed.
 6. **Foreign socket.** Add a second empty named `SOCKET_Mount_A` and re-export. It imports as a
-   socket, and PolySnap ignores it without a diagnostic (README §2.2). Confirms the plugin can
+   socket, and PolySnap ignores it without a diagnostic (DESIGN §2.2). Confirms the plugin can
    share a mesh with another system, which is the whole basis for equipment living elsewhere.
 7. **Batch export.** Blender's FBX exporter has a **Batch Mode → Collection** that writes one
    file per collection, the natural fit for §3's one-collection-per-piece rule. Its interaction

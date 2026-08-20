@@ -6,7 +6,7 @@
 #include "PolySnapTypes.h"
 
 /**
- * The socket maths of README sections 2.3 and 2.5. Pure: transforms in, transforms out, no
+ * The socket maths of DESIGN sections 2.3 and 2.5. Pure: transforms in, transforms out, no
  * engine state, no world. This is the part Milestone 1 exists to prove, and it is deliberately
  * reachable from an automation spec without spawning anything.
  *
@@ -117,7 +117,7 @@ public:
 	/**
 	 * The world transform a piece must take so that one of its sockets mates with an anchor.
 	 *
-	 * README section 2.5: exactly one socket pair is the anchor, and the piece's transform is
+	 * DESIGN section 2.5: exactly one socket pair is the anchor, and the piece's transform is
 	 * solved from the anchor and from nothing else. The result is a pure function of the anchor,
 	 * the polarity and the dihedral -- which is also what lets a server re-derive it instead of
 	 * trusting a client transform.
@@ -136,7 +136,7 @@ public:
 
 	/**
 	 * The dihedral that puts the held piece closest to the orientation it is already in, for one
-	 * polarity. README section 2.5's player-driven reading: the nearest point on the constraint
+	 * polarity. DESIGN section 2.5's player-driven reading: the nearest point on the constraint
 	 * manifold to the piece's current pose, so the player turns the piece roughly the way they
 	 * want it and the snap commits to that reading.
 	 *
@@ -153,7 +153,7 @@ public:
 
 	/**
 	 * Picks the polarity and dihedral nearest the piece's current orientation, over both
-	 * polarities. Both are always admissible (README section 2.3), so this is the whole of the
+	 * polarities. Both are always admissible (DESIGN section 2.3), so this is the whole of the
 	 * flip decision and the reason no explicit flip control exists.
 	 */
 	static void SolveNearestPlacement(const FTransform& HeldSocketLocal, const FTransform& CurrentPieceTransform,

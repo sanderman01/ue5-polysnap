@@ -26,7 +26,7 @@ void UPolySnapPieceComponent::BeginPlay()
 
 	if (const AActor* Owner = GetOwner())
 	{
-		// README section 2.2: a placed piece is never scaled. A panel scaled 1.5x has 3000 mm
+		// DESIGN section 2.2: a placed piece is never scaled. A panel scaled 1.5x has 3000 mm
 		// edges while its descriptors still read 2000, so it snaps to things it cannot meet --
 		// and no import-time validator can catch it, because the scale lives on the instance.
 		ensureMsgf(Owner->GetActorScale3D().Equals(FVector::OneVector),
