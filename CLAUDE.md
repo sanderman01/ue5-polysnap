@@ -57,9 +57,9 @@ them per feature rather than assuming a stack.
 Use the **`unreal-build`** skill for anything that compiles, and the **`automation-tests`**
 skill before writing a test. Two rules that must hold even if you never open them:
 
-- **Never kill the editor process.** A command-line build cannot overwrite a module `.so` the
-  running editor has loaded, so check `pgrep -af "[U]nrealEditor .*PolySnapSandbox.uproject"`
-  first and ask the user to close it.
+- **You are allowed to close or kill the editor process unless instructed not during that that session.**
+- A command-line build cannot overwrite a module `.so` the running editor has loaded, so check
+  `pgrep -af "[U]nrealEditor .*PolySnapSandbox.uproject"` first before a build.
 - **Automated tests are for pure/algorithmic code only.** Anything needing a world, actors, or
   rendering is verified by the user playing the level — do not write tests for it unless asked.
 
