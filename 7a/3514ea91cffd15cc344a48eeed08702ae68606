@@ -1,0 +1,47 @@
+CONVENTIONS.md
+  s_6d9bfabe4447f7::t_6440d377faa1b1 80-82,85-90,191-193
+  s_6d9bfabe4447f7::t_1e938050766508 83-84,307
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapGeometrySpec.cpp
+  s_6d9bfabe4447f7::t_113e88e6c4ff51 250
+  s_6d9bfabe4447f7::t_1a30d4d29855aa 278,339-344,346-461,463-464,472-477,486-489
+  s_6d9bfabe4447f7::t_545e68ee572d10 21-33,221-249,251-277
+  s_6d9bfabe4447f7::t_af23c2df7210ce 345
+  s_6d9bfabe4447f7::t_104a8083257868 462,465-471,478-485
+  s_6d9bfabe4447f7::t_ed90bd61a59f75 279
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapGeometry.cpp
+  s_6d9bfabe4447f7::t_9d492558be068e 76-78,84-90,97
+  s_6d9bfabe4447f7::t_461399679eec38 13-15,18-19,50-75,79-83,91-93,96,98,107-112,171-177,193-197
+  s_6d9bfabe4447f7::t_2ee03b8f634482 16-17
+  s_6d9bfabe4447f7::t_af23c2df7210ce 94-95
+  s_6d9bfabe4447f7::t_679d85c4a9dd09 113,178
+  s_6d9bfabe4447f7::t_670af26a726de0 99
+Plugins/PolySnap/Source/PolySnapEditor/Private/PolySnapMeshValidation.cpp
+  s_6d9bfabe4447f7::t_1e938050766508 149,151-152
+  s_6d9bfabe4447f7::t_6b6fc47d1578ee 137-144,146,150
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapSocketAxesSpec.cpp
+  s_6d9bfabe4447f7::t_af23c2df7210ce 143,149-151
+  s_6d9bfabe4447f7::t_97ea8c01904f96 135-142,144-148,152-153
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapSnapQuerySpec.cpp
+  s_6d9bfabe4447f7::t_d6d033f877c434 202-224,226-229,232-235
+  s_6d9bfabe4447f7::t_af23c2df7210ce 225,230-231
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapGeometry.h
+  s_6d9bfabe4447f7::t_3698ca510a0e02 37-49,57-69,74-77,81
+  s_6d9bfabe4447f7::t_7e52e6fd0dbc8c 125-129
+  s_6d9bfabe4447f7::t_9d492558be068e 50-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "7a3514ea91cffd15cc344a48eeed08702ae68606",
+  "prompts": {},
+  "sessions": {
+    "s_6d9bfabe4447f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a94bc6a0-e5cd-4ff4-8107-a81f8f5d7db6",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
