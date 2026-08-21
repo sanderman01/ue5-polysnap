@@ -1,0 +1,21 @@
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapBuckyballHarness.cpp
+  s_12e2ff1628434c::t_fbdf18d8c13244 5,7,22-25,436-470,536-543,723-725
+  s_12e2ff1628434c::t_babfbb10633573 481-492
+  s_12e2ff1628434c::t_16d8228cfd6504 471-472,726
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "4a9c7a29429ba226dffd08fdc827f18884796240",
+  "prompts": {},
+  "sessions": {
+    "s_12e2ff1628434c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71e2fad1-0de6-4b7f-810e-c1c95cd4cdfd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
