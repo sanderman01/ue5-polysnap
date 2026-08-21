@@ -44,6 +44,20 @@ constexpr EPolySnapPolarity Polarities[] = {EPolySnapPolarity::Aligned, EPolySna
 	return HeldSocket.Descriptor.IsCompatibleWith(TargetSocket.Descriptor);
 }
 
+/**
+ * True when a fold puts the held panel back into the half-plane the target panel occupies.
+ *
+ * At theta = 0 the mated Outward is the anchor's own Outward, so the held panel lies on the side
+ * of the shared edge the target part is already on: the two are in the same space. Refusing that
+ * is DESIGN section 2.5's coincident-placement rule, and it is decided here from the two socket
+ * bases alone -- no collision query, nothing the snapper has to ask the world.
+ */
+[[nodiscard]] bool IsCoincidentFold(double DihedralDegrees, double MinDihedralDegrees)
+{
+	const double Wrapped = FPolySnapGeometry::WrapDegrees(DihedralDegrees);
+	return Wrapped < MinDihedralDegrees || Wrapped > 360.0 - MinDihedralDegrees;
+}
+
 /** How far the held part must still turn to reach a given placement, in degrees. */
 [[nodiscard]] double RotationToPlacementDegrees(const FTransform& HeldSocketLocal,
 	const FTransform& CurrentPartTransform, const FPolySnapSocketBasis& Anchor, EPolySnapPolarity Polarity,
@@ -105,6 +119,17 @@ constexpr double RotationTieDegrees = 1.0e-3;
 				if (!FPolySnapGeometry::AdoptDihedralDegrees(HeldAnchorSocketLocal, HeldSecondaryLocal, AnchorBasis,
 						Polarity, TargetSocket.WorldTransform.GetLocation(), DihedralDegrees, ResidualUu)
 					|| ResidualUu > Tolerances.AdoptionDistanceUu)
+				{
+					continue;
+				}
+
+				// Skipped rather than returned on: a closure that folds the part onto the panel must not
+				// suppress a sensible one found later in the sweep, and when every closure on offer is
+				// this one the search finds nothing and the caller falls back to the player-driven
+				// reading. That fallback is the whole of the fix for two panels meeting along a single
+				// edge, where the intended coplanar answer closes no second pair and so was never a
+				// candidate here to begin with.
+				if (IsCoincidentFold(DihedralDegrees, Tolerances.MinDihedralDegrees))
 				{
 					continue;
 				}
@@ -245,6 +270,22 @@ FPolySnapCandidate FPolySnapSnapQuery::FindBest(const TArray<FPolySnapWorldSocke
 					Candidate.Polarity, Candidate.DihedralDegrees, Candidate.RequiredRotationDegrees);
 			}
 
+			// Only the player-driven branch can still land here, the adopt-driven one having skipped
+			// such a theta already. It means the part is being held all but on top of the panel it
+			// would mate with, so the pair is refused and the readout says why -- a seam that stays
+			// open is a better answer than two panels in one place.
+			if (PolySnapSnapQueryPrivate::IsCoincidentFold(Candidate.DihedralDegrees, Tolerances.MinDihedralDegrees))
+			{
+				if (OutRejections != nullptr)
+				{
+					OutRejections->Add(
+						FPolySnapRejectedPair{HeldSocket.Descriptor.SocketName, TargetSocket.Descriptor.SocketName,
+							EPolySnapRejection::Coincident, Candidate.GapUu, Candidate.TangentAngleDegrees});
+				}
+
+				continue;
+			}
+
 			Candidate.SolvedPartTransform = FPolySnapGeometry::SolvePartTransform(HeldSocketLocal, TargetBasis,
 				Candidate.Polarity, Candidate.DihedralDegrees);
 
@@ -362,6 +403,8 @@ FString FPolySnapSnapQuery::RejectionToString(EPolySnapRejection Rejection)
 			return TEXT("edges not collinear");
 		case EPolySnapRejection::JointFull:
 			return TEXT("already connected");
+		case EPolySnapRejection::Coincident:
+			return TEXT("would fold onto the panel");
 		default:
 			return TEXT("unknown");
 	}

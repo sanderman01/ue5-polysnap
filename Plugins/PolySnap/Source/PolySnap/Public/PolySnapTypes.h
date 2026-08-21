@@ -246,7 +246,8 @@ enum class EPolySnapRejection : uint8
 	Incompatible,
 	TooFar,
 	TangentNotCollinear,
-	JointFull
+	JointFull,
+	Coincident
 };
 
 /**

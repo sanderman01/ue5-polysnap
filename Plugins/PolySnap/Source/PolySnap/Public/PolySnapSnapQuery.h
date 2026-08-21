@@ -33,6 +33,17 @@ struct POLYSNAP_API FPolySnapQueryTolerances
 
 	/** How far from collinear an adopted pair's tangent lines may be. Polarity is ignored, as above. */
 	double AdoptionAngleToleranceDegrees = 5.0;
+
+	/**
+	 * How far a fold must be from fully closed before it counts as a placement at all
+	 * (DESIGN section 2.5).
+	 *
+	 * A dihedral near 0 or 360 puts the held socket's Outward onto the anchor's own Outward, so
+	 * the held panel lies in the half-plane the target panel already occupies -- the two are in
+	 * the same space. Decidable from the two socket bases alone, which is what lets this be
+	 * refused without a collision query the snapper has no business making.
+	 */
+	double MinDihedralDegrees = 5.0;
 };
 
 /** One rejected pair, kept so the debug readout can say why a snap did not happen. */

@@ -94,6 +94,22 @@ public:
 		meta = (ClampMin = "0.01", ClampMax = "89.0", ForceUnits = "deg"))
 	float AdoptionAngleToleranceDegrees = 5.0f;
 
+	/**
+	 * How far a fold must be from fully closed before it counts as a placement at all
+	 * (DESIGN section 2.5).
+	 *
+	 * A dihedral near 0 or 360 puts the held socket's Outward onto the anchor's own Outward, so
+	 * the held panel lies in the half-plane the target panel already occupies: the two are in the
+	 * same space. That is decidable from the two socket bases alone, which is what lets the
+	 * snapper refuse such a placement without the collision query it has no business making.
+	 *
+	 * Well clear of any angle a shell asks for -- a truncated icosahedron folds to 138 and 143
+	 * degrees, and a flat seam is 180 -- so the band costs nothing a builder would miss.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Snapping",
+		meta = (ClampMin = "0.0", ClampMax = "90.0", ForceUnits = "deg"))
+	float MinDihedralDegrees = 5.0f;
+
 	/** How far in front of the camera a held part is carried, before the player pushes or pulls it. */
 	UPROPERTY(config, EditAnywhere, Category = "Building", meta = (ClampMin = "10.0", ForceUnits = "cm"))
 	float DefaultHoldDistanceUu = 250.0f;

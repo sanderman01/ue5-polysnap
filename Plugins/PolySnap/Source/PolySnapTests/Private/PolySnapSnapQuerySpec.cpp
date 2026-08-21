@@ -424,6 +424,68 @@ void FPolySnapSnapQuerySpec::Define()
 						FVector(HalfPanelUu, 0.0, HalfPanelUu), 1.0e-3f);
 				});
 		});
+
+	Describe("refusing a placement that folds a part onto a part",
+		[this, Tolerances]()
+		{
+			// Two panels and one seam between them, which is where a build starts and where the
+			// least-rotation ranking has nothing to rank: the only closure on offer is the
+			// degenerate one, so something else has to refuse it.
+			const FTransform PanelA = FTransform::Identity;
+
+			It("stays coplanar when the only closure on offer would stack the panels",
+				[this, Tolerances, PanelA]()
+				{
+					// B held beside A the way a player holds it, a couple of units off true. Its far
+					// socket can only reach one of A's sockets by folding B flat onto A -- theta 0,
+					// residual zero, every remaining pair closed. The coplanar answer the player is
+					// asking for closes nothing at all, so it never enters the adopt-driven search;
+					// refusing the coincident fold is the only thing that leaves it standing.
+					const FTransform PanelB(FRotator::ZeroRotator, FVector(2.0 * HalfPanelUu + 2.0, 0.0, 0.0));
+
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelA)),
+						MakeSocket(2, TEXT("2000"), SecondarySocketAt(PanelA))};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(5, TEXT("2000"), SecondarySocketAt(PanelB)),
+						MakeSocket(6, TEXT("2000"), PrimarySocketAt(PanelB))};
+
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
+
+					TestTrue("found an anchor", Candidate.IsSet());
+					TestEqual("a flat seam", Candidate.DihedralDegrees, 180.0, 1.0);
+					TestEqual("nothing adopted", Candidate.Adoptions.Num(), 0);
+					TestEqual("left beside A rather than on it", Candidate.SolvedPartTransform.GetLocation(),
+						FVector(2.0 * HalfPanelUu, 0.0, 0.0), 1.0e-3f);
+				});
+
+			It("refuses a pair the part is already sitting on top of",
+				[this, Tolerances, PanelA]()
+				{
+					// B held exactly over A, a half turn about its own normal, so both of its sockets
+					// land on one of A's. Nothing here is a seam: the player-driven reading would
+					// commit the pose as it stands and weld two panels occupying one space.
+					const FTransform PanelB(FRotator(0.0, 180.0, 0.0), FVector::ZeroVector);
+
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelA)),
+						MakeSocket(2, TEXT("2000"), SecondarySocketAt(PanelA))};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(5, TEXT("2000"), SecondarySocketAt(PanelB)),
+						MakeSocket(6, TEXT("2000"), PrimarySocketAt(PanelB))};
+
+					TArray<FPolySnapRejectedPair> Rejections;
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances, &Rejections);
+
+					TestFalse("nothing to snap to", Candidate.IsSet());
+
+					const bool bSaidWhy = Rejections.ContainsByPredicate([](const FPolySnapRejectedPair& Pair)
+						{ return Pair.Reason == EPolySnapRejection::Coincident; });
+
+					// The readout has to name it. A snap that silently does nothing is the one failure
+					// a builder cannot tell from a bug.
+					TestTrue(*FString::Printf(TEXT("said why: %s"), *RejectionName(EPolySnapRejection::Coincident)),
+						bSaidWhy);
+				});
+		});
 }
 
 #endif // WITH_DEV_AUTOMATION_TESTS
