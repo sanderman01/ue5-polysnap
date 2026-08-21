@@ -1,0 +1,21 @@
+Config/DefaultPolySnap.ini
+  s_f16ff5a2c95ea8::t_fbf6104dde4b9d 5-8
+Config/DefaultEngine.ini
+  s_f16ff5a2c95ea8::t_8960388abbaa19 125-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "5c45f9d1f912329fc6e8db65743bd5817e4af2e0",
+  "prompts": {},
+  "sessions": {
+    "s_f16ff5a2c95ea8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6853a945-93c2-47aa-92a1-575e5d4c0f55",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
