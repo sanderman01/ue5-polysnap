@@ -1,0 +1,24 @@
+README.md
+  s_99198ce3ca0c91::t_5642152bacc8c3 107-110
+DESIGN.md
+  s_99198ce3ca0c91::t_e1678d71f9d3f3 349-352,356-359,362-370,374-380
+  s_99198ce3ca0c91::t_4fbd074090d4f7 360-361,551-561,607-609
+  s_99198ce3ca0c91::t_b712df083e8a83 550,562-567,610-614
+  s_99198ce3ca0c91::t_001b5f7a9b6d97 381
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "b1596660104a101da6b6cf8c7ee899568fdcb7f7",
+  "prompts": {},
+  "sessions": {
+    "s_99198ce3ca0c91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6d308852-ba85-47c3-851c-d0c2ab2cc199",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
