@@ -1,0 +1,29 @@
+DESIGN.md
+  s_c602b551b31aca::t_b035c3d5e90820 524-527
+  s_c602b551b31aca::t_72b85beaec86d7 458-487
+task-4-assembly-stability.md
+  s_c602b551b31aca::t_38175e0398a1f2 1-76
+task-2-piece-damping.md
+  s_c602b551b31aca::t_38175e0398a1f2 1-70
+README.md
+  s_c602b551b31aca::t_8a91bdac7b3069 36
+  s_c602b551b31aca::t_6c7bf8ec00e308 45-61
+task-3-physical-grab.md
+  s_c602b551b31aca::t_38175e0398a1f2 1-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "dab513358a5205f74ef434ea8491797b0d03ce64",
+  "prompts": {},
+  "sessions": {
+    "s_c602b551b31aca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76805d55-67f5-4855-ac1c-2f9a1cfeec44",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
