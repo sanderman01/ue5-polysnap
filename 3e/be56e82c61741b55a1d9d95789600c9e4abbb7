@@ -1,0 +1,28 @@
+Plugins/PolySnap/Source/PolySnapEditor/Private/PolySnapMeshValidation.cpp
+  s_6956bd4478b345::t_8f004e3c25566f 230-253
+  s_6956bd4478b345::t_36d30ca98fdea1 29-39,98,129-132,135,140,144
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapTypes.h
+  s_6956bd4478b345::t_aba96d6fcc7d1f 45,47-49,52,83,301,303,309,311
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapSettings.h
+  s_6956bd4478b345::t_d41d779afd73b8 155
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapSocketName.cpp
+  s_6956bd4478b345::t_8ebaba6c662b9c 7,211-212
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapSocketNameSpec.cpp
+  s_6956bd4478b345::t_07a0e3e37982d3 56-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "3ebe56e82c61741b55a1d9d95789600c9e4abbb7",
+  "prompts": {},
+  "sessions": {
+    "s_6956bd4478b345": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "737f4839-c121-4ffa-b8ef-7e56ad3fc382",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
