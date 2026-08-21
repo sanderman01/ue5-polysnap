@@ -33,7 +33,7 @@ explicitly authored connection points (DESIGN [§1](DESIGN.md#1-the-idea)).
 
 | Concept | What it is |
 | --- | --- |
-| **Piece** | A placeable object — a hull panel, a strut, a hatch. Owns a set of sockets. |
+| **Piece** | An actor carrying a `UPolySnapPieceComponent` — a hull panel, a strut, a hatch. Owns a set of sockets. |
 | **Socket** | A named, oriented connection point on a piece, with a type and a size. |
 | **Joint** | A shared edge line in space. Hosts two or more sockets — a seam, or a T-junction. |
 | **Connection** | A socket's participation in a joint. |
@@ -41,6 +41,23 @@ explicitly authored connection points (DESIGN [§1](DESIGN.md#1-the-idea)).
 | **Weld group** | A set of pieces within an assembly that have been welded into one rigid body. |
 
 ## How PolySnap works
+
+**A piece is a component, not a base class.** PolySnap ships no actor class to inherit from, so a
+project keeps its own actor hierarchy and adds a `UPolySnapPieceComponent` to whatever it already
+has. To author a piece:
+
+1. Export a static mesh whose sockets follow the `SOCKET_Edge_…` grammar
+   ([CONVENTIONS.md](CONVENTIONS.md)).
+2. Make any actor — Blueprint or C++, any parent class — with a mesh component using that mesh.
+3. Add a **PolySnap Piece** component to it. Leave `Socket Mesh` empty and it takes the actor's
+   first mesh component; set it explicitly when the actor has more than one.
+4. Set up the mesh's collision and physics yourself. It must block the `PhysicsBody` channel to be
+   grabbable, and simulate to react physically. Tick `Start Anchored` instead for a fixed piece to
+   build against — PolySnap holds those kinematic and refuses to pick them up.
+5. Place it at scale 1. Sockets carry edge lengths, so a scaled piece's sockets lie about what they
+   can meet, and the component says so at BeginPlay.
+
+(DESIGN [§2.11](DESIGN.md#211-a-piece-is-a-component-not-a-base-class))
 
 **Sockets are authored in Blender and named.** An edge socket is an empty at the midpoint of a
 panel edge, exported via FBX and imported as a static mesh socket. Its name carries its metadata:

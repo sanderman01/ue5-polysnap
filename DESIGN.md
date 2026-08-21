@@ -455,6 +455,36 @@ require a rewrite:
   geometry would leave them disagreeing for good, the solver being iterative and not bit-identical
   across machines.
 
+### 2.11 A piece is a component, not a base class
+
+**PolySnap ships no actor class.** A piece is any actor carrying a `UPolySnapPieceComponent`, and
+that component is the whole of what makes it one: it parses the mesh's sockets, holds the
+connection records, registers with the subsystem, applies the damping and sleep of §2.7, and owns
+the anchored rule. Authoring a piece is adding a component, never changing a parent class.
+
+**Why.** The plugin's destination is other projects, whose actors already have a base class of
+their own — a pooled actor, a `Pawn`, something with a project-wide interface on it. A required
+base class makes PolySnap compete with that hierarchy, and single inheritance means one of them
+loses. A component composes with anything, which is the point of the pattern.
+
+**Why not keep one as a convenience.** There was a `APolySnapPiece` doing exactly that, and its
+own header conceded nothing about it was required. A convenience base class that also carries
+behaviour becomes the documented path and the tested path, and the component path rots quietly
+until someone with their own actor discovers it never worked. Its one real behaviour was
+anchoring, which now lives on the component where a Blueprint actor can reach it — strictly more
+capability than before, since a Blueprint piece was never a subclass in the first place.
+
+**What PolySnap therefore does not own.** It does not create the mesh, choose the actor's root, or
+decide whether a body simulates. Collision and physics setup belong to whoever authored the actor,
+and that is not a gap to close later: a project that pools its pieces, drives them from a
+`GeometryCollection`, or keeps them kinematic under its own controller must be able to, and a
+plugin that quietly forced `SimulatePhysics` at BeginPlay would fight it. The one exception is an
+**anchored** piece, which PolySnap holds kinematic whatever the actor asked for, because it is the
+fixed reference the rest of the structure is built against and the builder refuses to pick it up.
+
+**Consequence for §2.9.** "Every piece's class" in a save record is the *project's* actor class,
+not a PolySnap one. Loading spawns that class and expects the component to come with it.
+
 ---
 
 ## 3. Player movement (test harness only)
@@ -491,6 +521,10 @@ Marked explicitly so nobody builds on them as though they were settled.
 
 - **Where equipment mounting lives.** Out of PolySnap (§2.2), but which plugin owns it, and
   whether it reuses this grammar under its own tag, is undecided.
+- **Spawning pieces.** A rack that hands the player a fresh panel needs a class to spawn, and since
+  §2.11 removed PolySnap's actor class there is nothing left to constrain that against. Whether it
+  becomes a `TSubclassOf<AActor>` validated at spawn for the component, a data asset listing piece
+  types, or stays entirely the game's problem is undecided.
 - **Curved edge subtypes.** Only `Straight` is in scope. Curves need a multi-parameter tail
   (radius and arc length), which the grammar accommodates but nothing has designed for.
 - **Collinear subdivision.** A long edge spanned by shorter ones — a 2 m panel meeting two 1 m
