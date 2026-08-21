@@ -152,7 +152,7 @@ public:
 	UPROPERTY(config, EditAnywhere, Category = "Validation")
 	bool bWarnOnSocketOffMidPlane = true;
 
-	/** Socket 001's Outward not parallel to the part's local +X. House style, not a requirement. */
+	/** The lowest-numbered socket's Outward not parallel to the part's local +X. House style, not a requirement. */
 	UPROPERTY(config, EditAnywhere, Category = "Validation")
 	bool bWarnOnUnalignedPrimarySocket = true;
 

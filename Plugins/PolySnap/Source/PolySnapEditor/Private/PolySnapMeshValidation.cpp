@@ -26,6 +26,17 @@ namespace PolySnapMeshValidationPrivate
 	return AngleDegrees <= ToleranceDegrees;
 }
 
+/**
+ * What the deferred lowest-ID check needs, kept for every socket that parsed cleanly.
+ *
+ * Doubles as the duplicate-ID set, so there is one map and one insertion point.
+ */
+struct FAcceptedSocket
+{
+	FName SocketName;
+	FVector Outward = FVector::ZeroVector;
+};
+
 /** True when the part is flat enough for the panel conventions to be meaningful. */
 [[nodiscard]] bool IsPlanar(const FBox& Bounds, double PlanarExtentRatio, int32& OutFlatAxis)
 {
@@ -84,7 +95,7 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 	int32 FlatAxis = 2;
 	const bool bPlanar = IsPlanar(Bounds, Settings.PlanarExtentRatio, FlatAxis);
 
-	TMap<int32, FName> SeenIds;
+	TMap<int32, FAcceptedSocket> SeenIds;
 
 	for (const TObjectPtr<UStaticMeshSocket>& SocketPtr : StaticMesh->Sockets)
 	{
@@ -115,23 +126,23 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 
 		const FString SocketName = Socket->SocketName.ToString();
 
+		const FTransform RawTransform = SocketTransform(*Socket);
+		const FTransform Transform = FPolySnapGeometry::Canonicalise(RawTransform, AxisCorrection);
+		const FPolySnapSocketBasis Basis = FPolySnapGeometry::BasisFromTransform(Transform);
+
 		// The tail was stripped by the parser, so this fires on a genuinely duplicated ID and not
 		// on a hex and a pent that merely shared a .blend.
-		if (const FName* Existing = SeenIds.Find(Descriptor.Id))
+		if (const FAcceptedSocket* Existing = SeenIds.Find(Descriptor.Id))
 		{
 			OutReport.Add(EPolySnapValidationSeverity::Error,
 				FString::Printf(TEXT("Duplicate socket ID %03d: '%s' and '%s'. IDs are permanent identity and "
 									 "must be unique within a part."),
-					Descriptor.Id, *Existing->ToString(), *SocketName));
+					Descriptor.Id, *Existing->SocketName.ToString(), *SocketName));
 		}
 		else
 		{
-			SeenIds.Add(Descriptor.Id, Socket->SocketName);
+			SeenIds.Add(Descriptor.Id, FAcceptedSocket{Socket->SocketName, Basis.Outward});
 		}
-
-		const FTransform RawTransform = SocketTransform(*Socket);
-		const FTransform Transform = FPolySnapGeometry::Canonicalise(RawTransform, AxisCorrection);
-		const FPolySnapSocketBasis Basis = FPolySnapGeometry::BasisFromTransform(Transform);
 
 		// -- Hard check 1: the socket's own frame ------------------------------------------
 		// On the raw transform, deliberately: Canonicalise strips the scale and would hide the
@@ -200,17 +211,6 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 			}
 		}
 
-		if (Settings.bWarnOnUnalignedPrimarySocket && Descriptor.Id == 1)
-		{
-			if (!IsParallel(Basis.Outward, FVector::ForwardVector, Settings.AxisAlignmentToleranceDegrees))
-			{
-				OutReport.Add(EPolySnapValidationSeverity::Warning,
-					FString::Printf(TEXT("Socket '%s' is socket 001 but its Outward is not along the part's "
-										 "local +X. House style, not a requirement of the snapping math."),
-						*SocketName));
-			}
-		}
-
 		if (Settings.bWarnOnNumericAuthoringTail)
 		{
 			FStringView Head;
@@ -225,6 +225,30 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 										 "the ID field."),
 						*SocketName));
 			}
+		}
+	}
+
+	// -- Deferred warning: the part's primary socket ---------------------------------------
+	// Primary means lowest-numbered, which is 001 on a 1-based part and 000 on a 0-based one.
+	// Which socket that is cannot be known until every name has been read, so this waits for the
+	// loop to finish. Only sockets that parsed cleanly are in the map, so a malformed name cannot
+	// take the role by accident.
+	if (Settings.bWarnOnUnalignedPrimarySocket && !SeenIds.IsEmpty())
+	{
+		int32 PrimaryId = MAX_int32;
+		for (const TPair<int32, FAcceptedSocket>& Entry : SeenIds)
+		{
+			PrimaryId = FMath::Min(PrimaryId, Entry.Key);
+		}
+
+		const FAcceptedSocket& Primary = SeenIds.FindChecked(PrimaryId);
+		if (!IsParallel(Primary.Outward, FVector::ForwardVector, Settings.AxisAlignmentToleranceDegrees))
+		{
+			OutReport.Add(EPolySnapValidationSeverity::Warning,
+				FString::Printf(TEXT("Socket '%s' is the part's lowest-numbered socket (%03d) but its Outward is "
+									 "not along the part's local +X. House style, not a requirement of the "
+									 "snapping math."),
+					*Primary.SocketName.ToString(), PrimaryId));
 		}
 	}
 }

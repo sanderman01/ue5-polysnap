@@ -42,11 +42,14 @@ struct POLYSNAP_API FPolySnapSocketDescriptor
 	FName SocketName;
 
 	/**
-	 * Identity within the part, 1-999. Permanent: save games store it, so a removed socket's ID
+	 * Identity within the part, 0-999. Permanent: save games store it, so a removed socket's ID
 	 * is retired rather than reassigned. Never participates in compatibility.
+	 *
+	 * INDEX_NONE rather than 0 when unset, because 000 is a real ID and cannot double as the
+	 * sentinel that tells IsValid a descriptor was never parsed.
 	 */
 	UPROPERTY(BlueprintReadOnly, Category = "PolySnap")
-	int32 Id = 0;
+	int32 Id = INDEX_NONE;
 
 	/** Edge geometry. All three compatibility terms must match for two sockets to mate. */
 	UPROPERTY(BlueprintReadOnly, Category = "PolySnap")
@@ -77,7 +80,7 @@ struct POLYSNAP_API FPolySnapSocketDescriptor
 	FName Length;
 
 	/** True once Parse has filled this in. A default-constructed descriptor matches nothing. */
-	[[nodiscard]] bool IsValid() const { return Id > 0 && !Thickness.IsNone() && !Length.IsNone(); }
+	[[nodiscard]] bool IsValid() const { return Id >= 0 && !Thickness.IsNone() && !Length.IsNone(); }
 
 	/**
 	 * DESIGN section 2.2: two sockets may connect only when SubType, Thickness and Length all
@@ -295,17 +298,17 @@ struct POLYSNAP_API FPolySnapConnection
 {
 	GENERATED_BODY()
 
-	/** ID of the socket on this part that is participating. */
+	/** ID of the socket on this part that is participating. INDEX_NONE until assigned: 000 is a real ID. */
 	UPROPERTY()
-	int32 LocalSocketId = 0;
+	int32 LocalSocketId = INDEX_NONE;
 
 	/** The part on the other side of the seam. */
 	UPROPERTY()
 	TWeakObjectPtr<UPolySnapConnectorComponent> OtherPart;
 
-	/** ID of the participating socket on that part. */
+	/** ID of the participating socket on that part. INDEX_NONE until assigned: 000 is a real ID. */
 	UPROPERTY()
-	int32 OtherSocketId = 0;
+	int32 OtherSocketId = INDEX_NONE;
 
 	/** True when this pair was the anchor, whose mating conditions held to float precision. */
 	UPROPERTY()

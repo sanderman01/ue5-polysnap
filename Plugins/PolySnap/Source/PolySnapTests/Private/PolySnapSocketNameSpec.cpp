@@ -53,6 +53,24 @@ void FPolySnapSocketNameSpec::Define()
 					TestEqual("thickness", Descriptor.Thickness.ToString(), TEXT("40"));
 				});
 
+			It("accepts ID zero, and treats the descriptor as valid",
+				[this]()
+				{
+					// 000 is an identity like any other. The assertion that matters is IsValid: the
+					// descriptor's unset sentinel used to be 0, so a parser that accepts 000 while
+					// IsValid still reads Id > 0 fails here and nowhere else.
+					TestEqual("result", ParseName(TEXT("Edge_000_Straight_40_2000")), TEXT("Parsed"));
+					TestEqual("id", Descriptor.Id, 0);
+					TestTrue("valid", Descriptor.IsValid());
+				});
+
+			It("treats a default-constructed descriptor as invalid",
+				[this]()
+				{
+					const FPolySnapSocketDescriptor Unset;
+					TestFalse("valid", Unset.IsValid());
+				});
+
 			It("accepts a size token of any width, in either size field",
 				[this]()
 				{
@@ -199,9 +217,6 @@ void FPolySnapSocketNameSpec::Define()
 					TestEqual("too long", ParseName(TEXT("Edge_0001_Straight_40_2000")), TEXT("Malformed"));
 					TestEqual("not a number", ParseName(TEXT("Edge_abc_Straight_40_2000")), TEXT("Malformed"));
 				});
-
-			It("rejects ID zero, which is not an identity",
-				[this]() { TestEqual("result", ParseName(TEXT("Edge_000_Straight_40_2000")), TEXT("Malformed")); });
 
 			It("rejects a subtype that is not in scope",
 				[this]() { TestEqual("result", ParseName(TEXT("Edge_001_Curved_2000_40")), TEXT("Malformed")); });

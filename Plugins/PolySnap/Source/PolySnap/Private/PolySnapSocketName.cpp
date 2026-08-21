@@ -4,10 +4,8 @@
 
 namespace PolySnapSocketNamePrivate
 {
-/** Three digits, zero-padded, 001-999. Zero is not an identity. */
+/** Three digits, zero-padded, 000-999. */
 constexpr int32 IdDigitCount = 3;
-constexpr int32 MinId = 1;
-constexpr int32 MaxId = 999;
 
 /** Fields in the head of a well-formed Straight socket: Edge, ID, SubType, Thickness, Length. */
 constexpr int32 StraightFieldCount = 5;
@@ -210,12 +208,9 @@ EPolySnapParseResult FPolySnapSocketName::Parse(FStringView SocketName, FPolySna
 		return EPolySnapParseResult::Malformed;
 	}
 
+	// No separate range check: exactly three digits is the range. The rule above admits 000 through
+	// 999 and nothing else, so a bounds test here would be unreachable code pretending to be a rule.
 	const int32 Id = ToInt(IdToken);
-	if (Id < MinId || Id > MaxId)
-	{
-		SetError(OutError, SocketName, FString::Printf(TEXT("ID must be in [%03d, %d]"), MinId, MaxId));
-		return EPolySnapParseResult::Malformed;
-	}
 
 	EPolySnapEdgeSubType SubType = EPolySnapEdgeSubType::Straight;
 	if (!ParseSubType(SubTypeToken, SubType))
