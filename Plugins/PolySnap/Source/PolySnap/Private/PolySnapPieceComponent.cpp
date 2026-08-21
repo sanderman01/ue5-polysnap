@@ -11,7 +11,6 @@
 #include "PhysicsEngine/BodyInstance.h"
 #include "PolySnap.h"
 #include "PolySnapGeometry.h"
-#include "PolySnapPiece.h"
 #include "PolySnapSettings.h"
 #include "PolySnapSocketName.h"
 #include "PolySnapSubsystem.h"
@@ -41,6 +40,15 @@ void UPolySnapPieceComponent::BeginPlay()
 	if (UPolySnapSubsystem* Subsystem = UPolySnapSubsystem::Get(this))
 	{
 		Subsystem->RegisterPiece(this);
+	}
+
+	// The only physics decision this component makes for itself. Whether the body simulates at all,
+	// its collision and its mass belong to whoever authored the actor (DESIGN section 2.11) -- an
+	// anchored piece is the single case where PolySnap overrules them, because it is the fixed
+	// reference the rest of the structure is built against.
+	if (bStartAnchored && ResolvedSocketMesh != nullptr)
+	{
+		ResolvedSocketMesh->SetSimulatePhysics(false);
 	}
 
 	ApplyPhysicsSettings();
@@ -96,15 +104,8 @@ void UPolySnapPieceComponent::SetSimulating(bool bSimulate)
 		return;
 	}
 
-	// APolySnapPiece knows about anchoring, so prefer its own answer where there is one.
-	if (APolySnapPiece* SnapPiece = Cast<APolySnapPiece>(GetOwner()))
-	{
-		SnapPiece->SetSimulating(bSimulate);
-	}
-	else
-	{
-		Mesh->SetSimulatePhysics(bSimulate);
-	}
+	// An anchored piece never simulates, whatever anyone asks for.
+	Mesh->SetSimulatePhysics(bSimulate && !bStartAnchored);
 
 	if (!bSimulate || !Mesh->IsSimulatingPhysics())
 	{

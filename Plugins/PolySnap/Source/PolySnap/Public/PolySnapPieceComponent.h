@@ -14,8 +14,13 @@ class UMeshComponent;
  * Makes an actor a PolySnap piece: parses the edge sockets off its mesh once, caches them, and
  * records what they are connected to.
  *
- * Add it to any actor that already has a mesh component. It finds the first one on the owner
- * unless one is assigned explicitly, so it works on a Blueprint actor with no code behind it.
+ * This component *is* the piece. PolySnap ships no actor class to inherit from, so a project keeps
+ * its own actor hierarchy and adds this to whatever it already has -- see DESIGN section 2.11. It
+ * finds the owner's first mesh component unless one is assigned explicitly, so it works on a
+ * Blueprint actor with no code behind it.
+ *
+ * What the owning actor still owns: its mesh, its root, and its collision and physics setup. This
+ * component never turns simulation on; it only forces kinematic when the piece is anchored.
  */
 UCLASS(ClassGroup = "PolySnap", meta = (BlueprintSpawnableComponent), DisplayName = "PolySnap Piece")
 class POLYSNAP_API UPolySnapPieceComponent : public UActorComponent
@@ -39,6 +44,13 @@ public:
 	/** The mesh whose sockets this piece owns. Null means "the owner's first mesh component". */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PolySnap")
 	TObjectPtr<UMeshComponent> SocketMesh;
+
+	/**
+	 * Keeps this piece kinematic, so it stays put and gives the player something fixed to build
+	 * against. In microgravity nothing else in the level holds still.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PolySnap")
+	bool bStartAnchored = false;
 
 	/**
 	 * Tick when this piece's mesh was authored to a different socket axis convention than the
@@ -65,22 +77,24 @@ public:
 	/** Reparses the mesh's sockets. Called at BeginPlay; public so an editor tool can refresh. */
 	void RebuildSocketCache();
 
+	/** True while this piece is a fixed reference: it never simulates and cannot be picked up. */
+	[[nodiscard]] bool IsAnchored() const { return bStartAnchored; }
+
 	/**
 	 * Applies UPolySnapSettings' damping and sleep thresholds to this piece's mesh body.
 	 *
-	 * Lives here rather than on APolySnapPiece because this component is what makes an actor a
-	 * piece: a plain Blueprint actor with a mesh and this component is a piece in every other
-	 * respect, and it needs the same physics or it drifts away in zero gravity. Called at
-	 * BeginPlay, whenever the settings change, and whenever the piece re-enters the simulation.
+	 * Every piece needs these or it drifts away in zero gravity, and a piece is whatever actor
+	 * carries this component, so this is the only place that can apply them. Called at BeginPlay,
+	 * whenever the settings change, and whenever the piece re-enters the simulation.
 	 */
 	void ApplyPhysicsSettings();
 
 	/**
 	 * Hands the piece to the simulation, or takes it out so it can be carried.
 	 *
-	 * The one place that knows what handing a piece back involves: an anchored APolySnapPiece
-	 * refuses, the physics settings are re-applied, and the body starts at rest rather than
-	 * carrying the velocity the solver derived while the player walked it into place.
+	 * The one place that knows what handing a piece back involves: an anchored piece refuses, the
+	 * physics settings are re-applied, and the body starts at rest rather than carrying the
+	 * velocity the solver derived while the player walked it into place.
 	 */
 	void SetSimulating(bool bSimulate);
 

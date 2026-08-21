@@ -21,7 +21,6 @@
 #include "PolySnap.h"
 #include "PolySnapDebug.h"
 #include "PolySnapGeometry.h"
-#include "PolySnapPiece.h"
 #include "PolySnapPieceComponent.h"
 #include "PolySnapSettings.h"
 #include "PolySnapSnapQuery.h"
@@ -258,8 +257,7 @@ bool UPolySnapBuilderComponent::GrabPieceUnderCrosshair()
 		return false;
 	}
 
-	if (const APolySnapPiece* SnapPiece = Cast<APolySnapPiece>(HitActor);
-		SnapPiece != nullptr && SnapPiece->bStartAnchored)
+	if (Piece->IsAnchored())
 	{
 		UE_LOG(LogPolySnap, Verbose, TEXT("'%s' is anchored and cannot be picked up."), *HitActor->GetName());
 		return false;
