@@ -379,11 +379,10 @@ void FPolySnapSnapQuerySpec::Define()
 					// The degenerate one: exactly where B's far socket lands if B folds onto A.
 					const FTransform StackedTarget(FRotator::ZeroRotator, FVector(-HalfPanelUu, 0.0, 0.0));
 
-					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"),
-						PrimarySocketAt(PanelA)), MakeSocket(2, TEXT("2000"), StandingTarget),
-						MakeSocket(3, TEXT("2000"), StackedTarget)};
-					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(5, TEXT("2000"),
-						SecondarySocketAt(PanelB)), MakeSocket(6, TEXT("2000"), PrimarySocketAt(PanelB))};
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelA)),
+						MakeSocket(2, TEXT("2000"), StandingTarget), MakeSocket(3, TEXT("2000"), StackedTarget)};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(5, TEXT("2000"), SecondarySocketAt(PanelB)),
+						MakeSocket(6, TEXT("2000"), PrimarySocketAt(PanelB))};
 
 					const FPolySnapCandidate Candidate =
 						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);

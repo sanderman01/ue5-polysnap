@@ -1,5 +1,6 @@
 // Copyright (c) 2026, Alexander Verbeek. All rights reserved.
 
+#include "CollisionShape.h"
 #include "Components/MeshComponent.h"
 #include "Containers/Ticker.h"
 #include "Engine/World.h"
@@ -49,7 +50,10 @@ const FName SpawnedTag(TEXT("PolySnapTestPart"));
 /** How far out to gather candidate sockets, as a multiple of the edge length. */
 constexpr double GatherRadiusInEdges = 3.0;
 
-static TAutoConsoleVariable<float> CVarClearanceUu(TEXT("PolySnap.Test.ClearanceUu"), 200.0f,
+/** How many times to lift the shell looking for room before giving up and saying so. */
+constexpr int32 ClearanceAttempts = 12;
+
+static TAutoConsoleVariable<float> CVarClearanceUu(TEXT("PolySnap.Test.ClearanceUu"), 100.0f,
 	TEXT("How much room to leave between the assembled shell and whatever is already in the level."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarPartCollision(TEXT("PolySnap.Test.PartCollision"), 1,
@@ -372,15 +376,20 @@ void ClearBuckyball(const TArray<FString>& Args, UWorld* World)
 }
 
 /**
- * Where to build: in front of the player and clear of the floor.
+ * Where to build: in front of the player, in space nothing else is occupying.
  *
- * Not a cosmetic choice. A shell built at the world origin is built inside whatever the level put
- * there, and thirty-two rigid bodies that start simulating already interpenetrating the floor are
- * flung apart by depenetration -- which looks exactly like a constraint network that cannot hold.
+ * Not a cosmetic choice, and not a number that happened to work once. Thirty-two rigid bodies that
+ * start simulating already interpenetrating the level are flung apart by depenetration the moment
+ * they wake, and the symptom -- seams stretching to centimetres, the shell wandering off -- looks
+ * exactly like a constraint network that cannot hold. So the spot is tested rather than assumed:
+ * a sphere the size of the shell is swept upwards until it finds room.
  */
 [[nodiscard]] FVector ChooseShellCentre(UWorld& World, double CircumradiusUu)
 {
 	const double ClearanceUu = FMath::Max(CVarClearanceUu.GetValueOnGameThread(), 0.0f);
+	const double RadiusUu = CircumradiusUu + ClearanceUu;
+
+	FVector Centre = FVector::UpVector * RadiusUu;
 
 	if (const APlayerController* Controller = World.GetFirstPlayerController())
 	{
@@ -390,14 +399,32 @@ void ClearBuckyball(const TArray<FString>& Args, UWorld* World)
 			FRotator ViewRotation = FRotator::ZeroRotator;
 			Controller->GetPlayerViewPoint(ViewLocation, ViewRotation);
 
-			// Far enough ahead to see the whole thing, and high enough to clear the ground the
-			// player is standing on.
-			return Pawn->GetActorLocation() + ViewRotation.Vector().GetSafeNormal2D() * (3.0 * CircumradiusUu)
-				 + FVector::UpVector * (CircumradiusUu + ClearanceUu);
+			// Four radii ahead, which is far enough back that the whole shell is in frame, and
+			// lifted so its lowest panel starts clear of the ground the player is standing on.
+			Centre = Pawn->GetActorLocation() + ViewRotation.Vector().GetSafeNormal2D() * (4.0 * CircumradiusUu);
+			Centre.Z = Pawn->GetActorLocation().Z - Pawn->GetSimpleCollisionHalfHeight() + RadiusUu;
 		}
 	}
 
-	return FVector::UpVector * (CircumradiusUu + ClearanceUu);
+	// Straight up, because up is the one direction a level is reliably empty in, and moving along
+	// the view would change how much of the shell is in frame.
+	const FCollisionShape Shell = FCollisionShape::MakeSphere(static_cast<float>(RadiusUu));
+
+	for (int32 Attempt = 0; Attempt < ClearanceAttempts; ++Attempt)
+	{
+		if (!World.OverlapBlockingTestByChannel(Centre, FQuat::Identity, ECC_WorldStatic, Shell))
+		{
+			return Centre;
+		}
+
+		Centre.Z += CircumradiusUu;
+	}
+
+	UE_LOG(LogPolySnap, Warning,
+		TEXT("PolySnap.Test.Buckyball: found nowhere clear to build; the shell will start ")
+			TEXT("interpenetrating the level and a simulated run will be flung apart."));
+
+	return Centre;
 }
 
 void SpawnBuckyball(const TArray<FString>& Args, UWorld* World)
@@ -598,6 +625,17 @@ void SpawnBuckyball(const TArray<FString>& Args, UWorld* World)
 			++ShellSockets;
 			ShellOpenSockets += Part->IsSocketConnected(Descriptor.Id) ? 0 : 1;
 		}
+	}
+
+	// Where the shell had to go to find room is not where the player happened to be looking, so
+	// point them at it. The command exists to show somebody a buckyball.
+	if (APlayerController* Controller = World->GetFirstPlayerController())
+	{
+		FVector ViewLocation = FVector::ZeroVector;
+		FRotator ViewRotation = FRotator::ZeroRotator;
+		Controller->GetPlayerViewPoint(ViewLocation, ViewRotation);
+
+		Controller->SetControlRotation((ShellCentreWorld - ViewLocation).Rotation());
 	}
 
 	UE_LOG(LogPolySnap, Display, TEXT("%s"), *Subsystem->BuildAssemblyReport());
