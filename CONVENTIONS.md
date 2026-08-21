@@ -173,8 +173,11 @@ snap math.
 
 ### Optional: the canonical part frame
 
-> **Socket `001`'s Outward points along the part's local +X** — that is, socket `001`'s empty
-> has zero rotation (§2).
+> **The part's lowest-numbered socket has its Outward along the part's local +X** — that is,
+> that socket's empty has zero rotation (§2).
+
+Lowest-numbered rather than literally `001`, because numbering may start at `000` (DESIGN §2.2)
+and the rule is about a part's first socket, not about a particular number.
 
 This makes a part's authored frame deterministic: panels of the same type become directly
 comparable and rotational variants trivial to diff. Without it, a part's yaw about its own
@@ -326,7 +329,7 @@ Everything else is a **warning** a project that authors differently can disable:
 | `Outward · (SocketPos − MeshCentroid) > 0` | `bWarnOnInwardOutward` | Outward pointing into the part — a 180° slip. Also catches swapped Outward/Tangent roles, since an Outward running along the edge drives the dot product to ≈ 0. A warning rather than an error because a concave outline can fail it legitimately. |
 | On a planar part, every socket Normal ∥ the part's local +Z | `bWarnOnNonCanonicalPartFrame` | A panel authored standing, or a socket with stray roll. |
 | On a planar part, socket `Z` ≈ the part's mid-thickness | `bWarnOnSocketOffMidPlane` | An origin on a face — the flip-displacement trap (§3). Scoped to planar parts, so it sits in the same tier as the convention it depends on. |
-| Socket `001`'s Outward ∥ the part's local +X | `bWarnOnUnalignedPrimarySocket` | A part not following the canonical-frame rule (§3). |
+| The lowest-numbered socket's Outward ∥ the part's local +X | `bWarnOnUnalignedPrimarySocket` | A part not following the canonical-frame rule (§3). Lowest-numbered, so the check applies whether a part is numbered from `000` or from `001`. |
 | A socket's authoring tail is purely numeric | `bWarnOnNumericAuthoringTail` | Blender assigned the tail itself, so a name collision went unnoticed. Benign, but the `_001` it imports as reads like the `ID` field. |
 
 All of them live in PolySnap's own `UDeveloperSettings`, not in project config — the plugin

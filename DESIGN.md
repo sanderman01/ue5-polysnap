@@ -62,7 +62,7 @@ one the parser ever sees.
 | --- | --- | --- |
 | `SOCKET_` | `SOCKET_` | Required prefix. How Unreal recognises the empty as a socket. |
 | `Edge` | `Edge` | Required namespace tag. Marks the socket as PolySnap's. Always this word. |
-| `ID` | `001` | Identity within the part. Three digits, zero-padded, `001`–`999`. |
+| `ID` | `001` | Identity within the part. Three digits, zero-padded, `000`–`999`. |
 | `SubType` | `Straight` | Edge geometry. **Only `Straight` is in scope** (§7). |
 | `Thickness` | `40` | Panel thickness at that edge. Letters and digits, **no unit implied**. |
 | `Length` | `2000` | Nominal edge length, on the same terms as `Thickness`. |
@@ -151,6 +151,10 @@ than being accommodated by a code path no asset exercises. The forced cost: a ty
 
 - **`ID` is permanent and unique within its part.** Save games store it (§2.9), so it is never
   renumbered or reused; retire the ID of a removed socket.
+- **`ID` is identity, not an index.** Nothing counts sockets, iterates a range of IDs or reads one
+  as an ordinal, so the numbering need not be contiguous and there is no reason to forbid `000`.
+  Number from `000` on a new part; a part already numbered from `001` is equally valid and is not
+  worth renumbering, since renumbering is exactly what the permanence rule forbids.
 - **A part's edge lengths are fixed for the life of the asset.** Resizing a panel is a **new
   asset**, not an edit — so socket names never change, and nothing can be broken by a rename that
   cannot happen.
