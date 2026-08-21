@@ -74,6 +74,26 @@ public:
 		meta = (ClampMin = "0.1", ClampMax = "89.0", ForceUnits = "deg"))
 	float TangentAngleToleranceDegrees = 20.0f;
 
+	/**
+	 * How close a second socket pair must come, once the anchor is solved, to be adopted into its
+	 * joint (DESIGN section 2.5).
+	 *
+	 * Not a second SnapDistanceUu. That one is how near the player has to aim; this is how much
+	 * geometric error a seam may carry and still count as closed, so it is far tighter -- panels
+	 * cut correctly close to float noise, and a millimetre here is already a loud number.
+	 *
+	 * DESIGN section 7 has it open in both directions: too tight and a correctly built vertex
+	 * refuses its second connection, too loose and visibly misaligned panels enter the graph as
+	 * though they had closed.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Snapping", meta = (ClampMin = "0.001", ForceUnits = "cm"))
+	float AdoptionDistanceUu = 2.0f;
+
+	/** How far from collinear an adopted pair's tangent lines may be. Polarity is ignored, as above. */
+	UPROPERTY(config, EditAnywhere, Category = "Snapping",
+		meta = (ClampMin = "0.01", ClampMax = "89.0", ForceUnits = "deg"))
+	float AdoptionAngleToleranceDegrees = 5.0f;
+
 	/** How far in front of the camera a held part is carried, before the player pushes or pulls it. */
 	UPROPERTY(config, EditAnywhere, Category = "Building", meta = (ClampMin = "10.0", ForceUnits = "cm"))
 	float DefaultHoldDistanceUu = 250.0f;

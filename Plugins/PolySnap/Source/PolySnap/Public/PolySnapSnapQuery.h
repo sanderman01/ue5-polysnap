@@ -18,6 +18,21 @@ struct POLYSNAP_API FPolySnapQueryTolerances
 
 	/** How far from collinear the two tangent lines may be, in degrees. */
 	double TangentAngleToleranceDegrees = 20.0;
+
+	/**
+	 * How close a secondary socket pair must come, once the anchor's transform is applied, to be
+	 * adopted into its joint (DESIGN section 2.5).
+	 *
+	 * Much tighter than SnapDistanceUu, and for a different reason: that one is how near the
+	 * player must aim, this one is how much geometric error a seam may carry and still count as
+	 * closed. DESIGN section 7 has it open in both directions -- too tight and a correctly built
+	 * vertex refuses its second connection, too loose and visibly misaligned panels are welded
+	 * into the graph as though they had closed.
+	 */
+	double AdoptionDistanceUu = 2.0;
+
+	/** How far from collinear an adopted pair's tangent lines may be. Polarity is ignored, as above. */
+	double AdoptionAngleToleranceDegrees = 5.0;
 };
 
 /** One rejected pair, kept so the debug readout can say why a snap did not happen. */
@@ -54,7 +69,11 @@ public:
 	/**
 	 * Finds the pair that should anchor a placement.
 	 *
-	 * The anchor is the pair the player is driving. Where several pass, they are scored
+	 * The anchor is the pair the player is driving, and its dihedral is solved in the order
+	 * DESIGN section 2.5 gives: adopt-driven first -- the theta that closes some second socket
+	 * pair, so the geometry already built decides the fold -- and the player-driven nearest
+	 * placement only when no second pair comes within AdoptionDistanceUu. Where several pass, they
+	 * are scored
 	 *
 	 *     cost = Gap / SnapDistance + RequiredRotation / TangentAngleTolerance
 	 *
@@ -67,11 +86,36 @@ public:
 	 * @param TargetSockets     Every other socket in range, in world space.
 	 * @param HeldPartTransform Where the held part currently is, which decides polarity.
 	 * @param OutRejections     Optional; the pairs that failed, for the debug readout.
-	 * @return The winning candidate, or an unset candidate when nothing passed.
+	 * @return The winning candidate, its Adoptions filled in, or an unset candidate when nothing
+	 *         passed.
 	 */
 	[[nodiscard]] static FPolySnapCandidate FindBest(const TArray<FPolySnapWorldSocket>& HeldSockets,
 		const TArray<FPolySnapWorldSocket>& TargetSockets, const FTransform& HeldPartTransform,
 		const FPolySnapQueryTolerances& Tolerances, TArray<FPolySnapRejectedPair>* OutRejections = nullptr);
+
+	/**
+	 * Every socket pair, other than the anchor's, that lands within the adoption tolerances once
+	 * the solved transform is applied. DESIGN section 2.5's "one anchor, many connections".
+	 *
+	 * Greedy by smallest gap, and each socket on either side is claimed at most once: a socket is
+	 * one edge of one panel, so two of them closing on the same target means one of the two is
+	 * wrong, and the nearer is the better guess.
+	 *
+	 * Only unconnected target sockets are adopted. A joint may host more than two panels (DESIGN
+	 * section 2.4), but joining a new part into an occupied joint needs the first-class joint that
+	 * Milestone 3 introduces; until then an adoption that silently made a seam a threesome would
+	 * be a harder bug to see than a seam that simply stayed open.
+	 *
+	 * Adopt or drop, per secondary: nothing here can reject the anchor. The player gets the
+	 * placement they asked for plus an unclosed seam they can see and nudge.
+	 *
+	 * @param HeldPartTransform Where the held part was when the anchor was chosen, which is what
+	 *                          the held sockets' world transforms are relative to.
+	 */
+	static void FindAdoptions(const TArray<FPolySnapWorldSocket>& HeldSockets,
+		const TArray<FPolySnapWorldSocket>& TargetSockets, const FTransform& HeldPartTransform,
+		const FPolySnapCandidate& Anchor, const FPolySnapQueryTolerances& Tolerances,
+		TArray<FPolySnapAdoption>& OutAdoptions);
 
 	/** Human-readable rejection reason, for logs and the on-screen readout. */
 	[[nodiscard]] static FString RejectionToString(EPolySnapRejection Rejection);

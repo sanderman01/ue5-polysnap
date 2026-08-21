@@ -17,11 +17,9 @@
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
-#include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include "PolySnap.h"
 #include "PolySnapConnectorComponent.h"
 #include "PolySnapDebug.h"
-#include "PolySnapGeometry.h"
 #include "PolySnapSettings.h"
 #include "PolySnapSnapQuery.h"
 #include "PolySnapSubsystem.h"
@@ -370,102 +368,17 @@ void UPolySnapBuilderComponent::PlaceHeldPart()
 
 	const FPolySnapCandidate Candidate = CurrentCandidate;
 
-	// The anchor's mating conditions hold to float precision at this instant, and only at this
-	// instant -- the next physics tick perturbs everything, the anchor included. Measuring here is
-	// what makes the error diagnosable where it is introduced.
+	// The teleport comes first, and the residuals are measured from where the sockets actually
+	// land rather than from where the solve said they would. DESIGN section 2.5's exactness
+	// describes this instant and no other: the next physics tick perturbs everything.
 	PartActor->SetActorTransform(Candidate.SolvedPartTransform, false, nullptr, ETeleportType::TeleportPhysics);
 
-	const FTransform PlacedHeldSocket = Part->GetSocketWorldTransform(Candidate.HeldSocket.Descriptor.SocketName);
-	const FTransform PlacedTargetSocket =
-		Candidate.TargetSocket.Part.IsValid()
-			? Candidate.TargetSocket.Part->GetSocketWorldTransform(Candidate.TargetSocket.Descriptor.SocketName)
-			: Candidate.TargetSocket.WorldTransform;
+	if (UPolySnapSubsystem* Subsystem = UPolySnapSubsystem::Get(this))
+	{
+		Subsystem->CommitPlacement(Candidate, /*bCreateConstraints=*/true);
+	}
 
-	const double ResidualUu = FVector::Dist(PlacedHeldSocket.GetLocation(), PlacedTargetSocket.GetLocation());
-
-	CommitConnection(Candidate, ResidualUu);
 	DropHeldPart();
-}
-
-void UPolySnapBuilderComponent::CommitConnection(const FPolySnapCandidate& Candidate, double ResidualUu)
-{
-	UPolySnapConnectorComponent* HeldConnector = Candidate.HeldSocket.Part.Get();
-	UPolySnapConnectorComponent* TargetConnector = Candidate.TargetSocket.Part.Get();
-
-	if (HeldConnector == nullptr || TargetConnector == nullptr)
-	{
-		return;
-	}
-
-	const float ResidualMm = static_cast<float>(ResidualUu * PolySnapBuilderPrivate::UuToMm);
-
-	// One record per participating socket, which is the shape persistence stores and the shape a
-	// joint of degree three will need without a special case.
-	FPolySnapConnection HeldSide;
-	HeldSide.LocalSocketId = Candidate.HeldSocket.Descriptor.Id;
-	HeldSide.OtherPart = TargetConnector;
-	HeldSide.OtherSocketId = Candidate.TargetSocket.Descriptor.Id;
-	HeldSide.bWasAnchor = true;
-	HeldSide.ResidualMm = ResidualMm;
-	HeldConnector->AddConnection(HeldSide);
-
-	FPolySnapConnection TargetSide;
-	TargetSide.LocalSocketId = Candidate.TargetSocket.Descriptor.Id;
-	TargetSide.OtherPart = HeldConnector;
-	TargetSide.OtherSocketId = Candidate.HeldSocket.Descriptor.Id;
-	TargetSide.bWasAnchor = true;
-	TargetSide.ResidualMm = ResidualMm;
-	TargetConnector->AddConnection(TargetSide);
-
-	UE_LOG(LogPolySnap, Log,
-		TEXT("Snapped '%s' socket %03d to '%s' socket %03d: polarity %s, dihedral %.3f deg, residual %.4f mm."),
-			*GetNameSafe(HeldConnector->GetOwner()), HeldSide.LocalSocketId, *GetNameSafe(TargetConnector->GetOwner()),
-			TargetSide.LocalSocketId,
-			Candidate.Polarity == EPolySnapPolarity::Aligned ? TEXT("aligned")
-															 : TEXT("flipped"), Candidate.DihedralDegrees, ResidualMm);
-
-	// Simulation is enabled before the constraint is created, because the constraint needs live
-	// body instances on both sides to bind to.
-	HeldConnector->SetSimulating(true);
-
-	UMeshComponent* HeldMesh = HeldConnector->GetResolvedSocketMesh();
-	UMeshComponent* TargetMesh = TargetConnector->GetResolvedSocketMesh();
-	AActor* TargetActor = TargetConnector->GetOwner();
-
-	if (HeldMesh == nullptr || TargetMesh == nullptr || TargetActor == nullptr)
-	{
-		return;
-	}
-
-	const FTransform JointTransform =
-		TargetConnector->GetSocketWorldTransform(Candidate.TargetSocket.Descriptor.SocketName);
-	const FPolySnapSocketBasis JointBasis = FPolySnapGeometry::BasisFromTransform(JointTransform);
-
-	UPhysicsConstraintComponent* Constraint = NewObject<UPhysicsConstraintComponent>(TargetActor);
-	Constraint->RegisterComponent();
-	Constraint->AttachToComponent(TargetMesh, FAttachmentTransformRules::KeepWorldTransform);
-
-	// A physics constraint twists about its own local +X, so pointing that axis along the shared
-	// edge is what makes the free degree of freedom the dihedral and nothing else.
-	Constraint->SetWorldLocationAndRotation(JointBasis.Location,
-		FRotationMatrix::MakeFromX(JointBasis.Tangent).ToQuat());
-
-	Constraint->SetLinearXLimit(LCM_Locked, 0.0f);
-	Constraint->SetLinearYLimit(LCM_Locked, 0.0f);
-	Constraint->SetLinearZLimit(LCM_Locked, 0.0f);
-	Constraint->SetAngularSwing1Limit(ACM_Locked, 0.0f);
-	Constraint->SetAngularSwing2Limit(ACM_Locked, 0.0f);
-
-	// The one freedom the joint keeps. Nothing authors an angle: what removes this freedom is the
-	// next connection, not a limit set here.
-	Constraint->SetAngularTwistLimit(ACM_Free, 0.0f);
-
-	// The two panels meet flush along the seam, so leaving collision on between them is a
-	// guaranteed source of jitter for no benefit.
-	Constraint->SetDisableCollision(true);
-	Constraint->SetConstrainedComponents(TargetMesh, NAME_None, HeldMesh, NAME_None);
-
-	FPolySnapDebug::DrawCommittedJoint(GetWorld(), JointTransform, Candidate.DihedralDegrees);
 }
 
 void UPolySnapBuilderComponent::TickComponent(float DeltaTime, ELevelTick TickType,

@@ -5,6 +5,111 @@
 #include "PolySnapConnectorComponent.h"
 #include "PolySnapGeometry.h"
 
+namespace PolySnapSnapQueryPrivate
+{
+/** Every polarity a placement may take. Both are always admissible -- DESIGN section 2.3. */
+constexpr EPolySnapPolarity Polarities[] = {EPolySnapPolarity::Aligned, EPolySnapPolarity::Flipped};
+
+/** True when the two world sockets are the same socket of the same part. */
+[[nodiscard]] bool IsSameSocket(const FPolySnapWorldSocket& A, const FPolySnapWorldSocket& B)
+{
+	return A.Part == B.Part && A.Descriptor.Id == B.Descriptor.Id;
+}
+
+/**
+ * Whether a pair may be considered for adoption at all, before any distance is measured.
+ *
+ * Deliberately stricter than TestPair on one point: the target socket must be unconnected. See
+ * FindAdoptions for why a joint of degree three is Milestone 3's business rather than something
+ * to fall into by accident.
+ */
+[[nodiscard]] bool IsAdoptable(const FPolySnapWorldSocket& HeldSocket, const FPolySnapWorldSocket& TargetSocket,
+	const FPolySnapCandidate& Anchor)
+{
+	if (HeldSocket.Part.IsValid() && HeldSocket.Part == TargetSocket.Part)
+	{
+		return false;
+	}
+
+	if (TargetSocket.bConnected || HeldSocket.bConnected)
+	{
+		return false;
+	}
+
+	if (IsSameSocket(HeldSocket, Anchor.HeldSocket) || IsSameSocket(TargetSocket, Anchor.TargetSocket))
+	{
+		return false;
+	}
+
+	return HeldSocket.Descriptor.IsCompatibleWith(TargetSocket.Descriptor);
+}
+
+/** How far the held part must still turn to reach a given placement, in degrees. */
+[[nodiscard]] double RotationToPlacementDegrees(const FTransform& HeldSocketLocal,
+	const FTransform& CurrentPartTransform, const FPolySnapSocketBasis& Anchor, EPolySnapPolarity Polarity,
+	double DihedralDegrees)
+{
+	const FQuat CurrentSocketRotation = CurrentPartTransform.GetRotation() * HeldSocketLocal.GetRotation();
+	const FQuat SolvedRotation =
+		FPolySnapGeometry::TransformFromBasis(FPolySnapGeometry::MatedBasis(Anchor, Polarity, DihedralDegrees))
+			.GetRotation();
+
+	return FPolySnapGeometry::AngleBetweenDegrees(SolvedRotation, CurrentSocketRotation);
+}
+
+/**
+ * DESIGN section 2.5 step 1: the theta and polarity that close some second socket pair, searched
+ * over every secondary pair and both polarities, smallest residual winning.
+ *
+ * @return False when no secondary pair comes within AdoptionDistanceUu, which is the caller's cue
+ *         to fall back to the player-driven reading.
+ */
+[[nodiscard]] bool SolveAdoptDrivenPlacement(const TArray<FPolySnapWorldSocket>& HeldSockets,
+	const TArray<FPolySnapWorldSocket>& TargetSockets, const FTransform& HeldPartTransform,
+	const FPolySnapCandidate& Anchor, const FTransform& HeldAnchorSocketLocal, const FPolySnapSocketBasis& AnchorBasis,
+	const FPolySnapQueryTolerances& Tolerances, EPolySnapPolarity& OutPolarity, double& OutDihedralDegrees)
+{
+	double BestResidualUu = Tolerances.AdoptionDistanceUu;
+	bool bFound = false;
+
+	for (const FPolySnapWorldSocket& HeldSocket : HeldSockets)
+	{
+		const FVector HeldSecondaryLocal =
+			HeldPartTransform.InverseTransformPosition(HeldSocket.WorldTransform.GetLocation());
+
+		for (const FPolySnapWorldSocket& TargetSocket : TargetSockets)
+		{
+			if (!IsAdoptable(HeldSocket, TargetSocket, Anchor))
+			{
+				continue;
+			}
+
+			for (const EPolySnapPolarity Polarity : Polarities)
+			{
+				double DihedralDegrees = 0.0;
+				double ResidualUu = 0.0;
+
+				if (!FPolySnapGeometry::AdoptDihedralDegrees(HeldAnchorSocketLocal, HeldSecondaryLocal, AnchorBasis,
+						Polarity, TargetSocket.WorldTransform.GetLocation(), DihedralDegrees, ResidualUu))
+				{
+					continue;
+				}
+
+				if (ResidualUu < BestResidualUu)
+				{
+					BestResidualUu = ResidualUu;
+					OutPolarity = Polarity;
+					OutDihedralDegrees = DihedralDegrees;
+					bFound = true;
+				}
+			}
+		}
+	}
+
+	return bFound;
+}
+} // namespace PolySnapSnapQueryPrivate
+
 EPolySnapRejection FPolySnapSnapQuery::TestPair(const FPolySnapWorldSocket& HeldSocket,
 	const FPolySnapWorldSocket& TargetSocket, const FPolySnapQueryTolerances& Tolerances,
 	FPolySnapCandidate& OutCandidate)
@@ -106,8 +211,20 @@ FPolySnapCandidate FPolySnapSnapQuery::FindBest(const TArray<FPolySnapWorldSocke
 
 			const FPolySnapSocketBasis TargetBasis = FPolySnapGeometry::BasisFromTransform(TargetSocket.WorldTransform);
 
-			FPolySnapGeometry::SolveNearestPlacement(HeldSocketLocal, HeldPartTransform, TargetBasis,
-				Candidate.Polarity, Candidate.DihedralDegrees, Candidate.RequiredRotationDegrees);
+			// DESIGN section 2.5 solves theta in this order, and the order is the whole point: with
+			// a second pair in tolerance the fold is decided by the geometry already built, and
+			// only without one does it fall to how the player happens to be holding the part.
+			if (PolySnapSnapQueryPrivate::SolveAdoptDrivenPlacement(HeldSockets, TargetSockets, HeldPartTransform,
+					Candidate, HeldSocketLocal, TargetBasis, Tolerances, Candidate.Polarity, Candidate.DihedralDegrees))
+			{
+				Candidate.RequiredRotationDegrees = PolySnapSnapQueryPrivate::RotationToPlacementDegrees(
+					HeldSocketLocal, HeldPartTransform, TargetBasis, Candidate.Polarity, Candidate.DihedralDegrees);
+			}
+			else
+			{
+				FPolySnapGeometry::SolveNearestPlacement(HeldSocketLocal, HeldPartTransform, TargetBasis,
+					Candidate.Polarity, Candidate.DihedralDegrees, Candidate.RequiredRotationDegrees);
+			}
 
 			Candidate.SolvedPartTransform = FPolySnapGeometry::SolvePartTransform(HeldSocketLocal, TargetBasis,
 				Candidate.Polarity, Candidate.DihedralDegrees);
@@ -123,7 +240,91 @@ FPolySnapCandidate FPolySnapSnapQuery::FindBest(const TArray<FPolySnapWorldSocke
 		}
 	}
 
+	// Only for the winner. An adoption is a consequence of a solved transform, so working them out
+	// for every pair that merely could have anchored would be the same search repeated once per
+	// candidate for an answer thrown away.
+	if (Best.IsSet())
+	{
+		FindAdoptions(HeldSockets, TargetSockets, HeldPartTransform, Best, Tolerances, Best.Adoptions);
+	}
+
 	return Best;
+}
+
+void FPolySnapSnapQuery::FindAdoptions(const TArray<FPolySnapWorldSocket>& HeldSockets,
+	const TArray<FPolySnapWorldSocket>& TargetSockets, const FTransform& HeldPartTransform,
+	const FPolySnapCandidate& Anchor, const FPolySnapQueryTolerances& Tolerances,
+	TArray<FPolySnapAdoption>& OutAdoptions)
+{
+	using namespace PolySnapSnapQueryPrivate;
+
+	OutAdoptions.Reset();
+
+	TArray<FPolySnapAdoption> Passing;
+
+	for (const FPolySnapWorldSocket& HeldSocket : HeldSockets)
+	{
+		// Where this socket ends up once the anchor's transform is applied. The held sockets were
+		// gathered before the solve, so every one of them still describes the pose the part is
+		// being carried in.
+		const FTransform HeldSocketLocal = HeldSocket.WorldTransform.GetRelativeTransform(HeldPartTransform);
+		const FTransform PlacedSocket = HeldSocketLocal * Anchor.SolvedPartTransform;
+		const FPolySnapSocketBasis PlacedBasis = FPolySnapGeometry::BasisFromTransform(PlacedSocket);
+
+		for (const FPolySnapWorldSocket& TargetSocket : TargetSockets)
+		{
+			if (!IsAdoptable(HeldSocket, TargetSocket, Anchor))
+			{
+				continue;
+			}
+
+			const FPolySnapSocketBasis TargetBasis = FPolySnapGeometry::BasisFromTransform(TargetSocket.WorldTransform);
+
+			const double GapUu = FVector::Dist(PlacedBasis.Location, TargetBasis.Location);
+			if (GapUu > Tolerances.AdoptionDistanceUu)
+			{
+				continue;
+			}
+
+			const double TangentAlignment = FMath::Abs(PlacedBasis.Tangent | TargetBasis.Tangent);
+			const double TangentAngleDegrees =
+				FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(TangentAlignment, -1.0, 1.0)));
+
+			if (TangentAngleDegrees > Tolerances.AdoptionAngleToleranceDegrees)
+			{
+				continue;
+			}
+
+			if (!JointAcceptsParticipant(HeldSocket, TargetSocket))
+			{
+				continue;
+			}
+
+			Passing.Add(FPolySnapAdoption{HeldSocket.Descriptor.Id, TargetSocket, GapUu, TangentAngleDegrees});
+		}
+	}
+
+	// Nearest first, then claim. A socket is one edge of one panel, so where two pairs want the
+	// same socket the closer one is the better reading of what the builder meant.
+	Passing.Sort([](const FPolySnapAdoption& A, const FPolySnapAdoption& B) { return A.GapUu < B.GapUu; });
+
+	TArray<int32> ClaimedHeldIds;
+	TArray<TPair<const UPolySnapConnectorComponent*, int32>> ClaimedTargets;
+
+	for (const FPolySnapAdoption& Adoption : Passing)
+	{
+		const TPair<const UPolySnapConnectorComponent*, int32> TargetKey(Adoption.TargetSocket.Part.Get(),
+			Adoption.TargetSocket.Descriptor.Id);
+
+		if (ClaimedHeldIds.Contains(Adoption.HeldSocketId) || ClaimedTargets.Contains(TargetKey))
+		{
+			continue;
+		}
+
+		ClaimedHeldIds.Add(Adoption.HeldSocketId);
+		ClaimedTargets.Add(TargetKey);
+		OutAdoptions.Add(Adoption);
+	}
 }
 
 FString FPolySnapSnapQuery::RejectionToString(EPolySnapRejection Rejection)

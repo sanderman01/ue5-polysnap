@@ -152,6 +152,35 @@ public:
 		double& OutRequiredRotationDegrees);
 
 	/**
+	 * The dihedral that brings one secondary socket pair as close together as rotation about the
+	 * shared edge can. DESIGN section 2.5's adopt-driven reading, and the one that takes
+	 * precedence: where a second pair is in tolerance, the placement is decided by the geometry
+	 * already built rather than by how the player happened to be holding the part.
+	 *
+	 * Closed form, not a search. Solving the anchor at theta = 0 and then hinging is a rigid
+	 * rotation of the whole part about the world line through the anchor, so the secondary socket
+	 * sweeps a circle about that line. Decompose both offsets from the anchor into components
+	 * along and across the axis, and one atan2 turns the held socket's across-axis component onto
+	 * the target's.
+	 *
+	 * The along-axis component does not rotate, and neither does the radius: whatever those two
+	 * leave over is the residual, and it is returned as the true post-solve distance rather than
+	 * as either component, because that is the number a connection records.
+	 *
+	 * @param HeldAnchorSocketLocal The anchor socket's transform relative to its part.
+	 * @param HeldSecondaryLocal    The secondary socket's position relative to the same part.
+	 * @param Anchor                The target socket's basis, in world space.
+	 * @param Polarity              Which way round the held part ends up.
+	 * @param TargetSecondaryLocation The world position the secondary socket should close on.
+	 * @return False when the secondary lies on the anchor axis, or its target does. Such a socket
+	 *         sweeps a degenerate circle and has no dihedral to offer, so it is skipped rather
+	 *         than answered with a meaningless angle.
+	 */
+	[[nodiscard]] static bool AdoptDihedralDegrees(const FTransform& HeldAnchorSocketLocal,
+		const FVector& HeldSecondaryLocal, const FPolySnapSocketBasis& Anchor, EPolySnapPolarity Polarity,
+		const FVector& TargetSecondaryLocation, double& OutDihedralDegrees, double& OutResidualUu);
+
+	/**
 	 * Picks the polarity and dihedral nearest the part's current orientation, over both
 	 * polarities. Both are always admissible (DESIGN section 2.3), so this is the whole of the
 	 * flip decision and the reason no explicit flip control exists.

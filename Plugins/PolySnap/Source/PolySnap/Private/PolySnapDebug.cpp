@@ -272,6 +272,24 @@ void Nudge(const TArray<FString>& Args, UWorld* World)
 	UE_LOG(LogPolySnap, Display, TEXT("PolySnap.Nudge: shoved %d part(s) at %.0f cm/s."), NudgedCount, Speed);
 }
 
+/** PolySnap.Report -- what the assembly currently is, and how well it closed. */
+void Report(const TArray<FString>& Args, UWorld* World)
+{
+	const UPolySnapSubsystem* Subsystem = World != nullptr ? World->GetSubsystem<UPolySnapSubsystem>() : nullptr;
+	if (Subsystem == nullptr)
+	{
+		UE_LOG(LogPolySnap, Warning, TEXT("PolySnap.Report: no PolySnap subsystem in this world."));
+		return;
+	}
+
+	UE_LOG(LogPolySnap, Display, TEXT("%s"), *Subsystem->BuildAssemblyReport());
+}
+
+static FAutoConsoleCommandWithWorldAndArgs CmdReport(TEXT("PolySnap.Report"),
+	TEXT("PolySnap.Report. Parts, connections, open sockets, and the residuals the adopted ")
+		TEXT("connections closed at. Open sockets is what says whether a shell sealed."),
+			FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&Report));
+
 static FAutoConsoleCommandWithWorldAndArgs CmdDumpPhysics(TEXT("PolySnap.DumpPhysics"),
 	TEXT("PolySnap.DumpPhysics [seconds]. Logs what each part's body actually has: state, speed, ")
 		TEXT("damping, sleep multiplier. With a duration, samples every half second so a part can be ")

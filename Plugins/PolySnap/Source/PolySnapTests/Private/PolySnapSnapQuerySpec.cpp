@@ -45,6 +45,12 @@ static FTransform PrimarySocketAt(const FTransform& PartTransform)
 	return FTransform(FRotator::ZeroRotator, FVector(HalfPanelUu, 0.0, 0.0)) * PartTransform;
 }
 
+/** The socket on the -X edge of a panel at the given transform, facing the other way. */
+static FTransform SecondarySocketAt(const FTransform& PartTransform)
+{
+	return FTransform(FRotator(0.0, 180.0, 0.0), FVector(-HalfPanelUu, 0.0, 0.0)) * PartTransform;
+}
+
 static FString RejectionName(EPolySnapRejection Rejection)
 {
 	return FPolySnapSnapQuery::RejectionToString(Rejection);
@@ -269,6 +275,121 @@ void FPolySnapSnapQuerySpec::Define()
 						TestEqual("reason", RejectionName(Rejections[0].Reason),
 							RejectionName(EPolySnapRejection::TooFar));
 					}
+				});
+		});
+
+	Describe("adopting the connections a placement closes",
+		[this, Tolerances]()
+		{
+			// Three panels in a row, coplanar: A at the origin, C two panel widths along, and B
+			// placed between them. Mating B on A's edge is one anchor; B's other edge landing on C's
+			// is the adoption. Every closure a builder makes is this, with more geometry.
+			const FTransform PanelA = FTransform::Identity;
+			const FTransform PanelC(FRotator::ZeroRotator, FVector(4.0 * HalfPanelUu, 0.0, 0.0));
+
+			It("adopts a second pair the anchor's transform brings into tolerance",
+				[this, Tolerances, PanelA, PanelC]()
+				{
+					// B held a little off true, the way a player holds it: near enough for the anchor,
+					// and its far socket therefore near enough for C once the anchor is solved.
+					const FTransform PanelB(FRotator(0.0, 1.0, 0.0), FVector(2.0 * HalfPanelUu + 3.0, 1.0, 0.0));
+
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelA)),
+						MakeSocket(2, TEXT("2000"), SecondarySocketAt(PanelC))};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(5, TEXT("2000"), SecondarySocketAt(PanelB)),
+						MakeSocket(6, TEXT("2000"), PrimarySocketAt(PanelB))};
+
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
+
+					TestTrue("found an anchor", Candidate.IsSet());
+					TestEqual("one adoption", Candidate.Adoptions.Num(), 1);
+
+					if (Candidate.Adoptions.Num() == 1)
+					{
+						// The adoption is the pair the anchor did not use, on both sides of the seam.
+						TestNotEqual("a different held socket", Candidate.Adoptions[0].HeldSocketId,
+							Candidate.HeldSocket.Descriptor.Id);
+						TestNotEqual("a different target socket", Candidate.Adoptions[0].TargetSocket.Descriptor.Id,
+							Candidate.TargetSocket.Descriptor.Id);
+
+						// Coplanar panels of the right length: the seam closes to float noise, which is
+						// the whole claim the milestone measurement rests on.
+						TestTrue("closed to well under the tolerance",
+							Candidate.Adoptions[0].GapUu < 0.5 * Tolerances.AdoptionDistanceUu);
+					}
+				});
+
+			It("keeps the anchor when the second pair is out of tolerance",
+				[this, Tolerances, PanelA]()
+				{
+					// C a centimetre out of reach: a panel set that does not quite fit. Adopt or drop,
+					// per secondary -- the player still gets the placement they asked for, plus a seam
+					// they can see is open.
+					const FTransform FarPanelC(FRotator::ZeroRotator, FVector(4.0 * HalfPanelUu + 10.0, 0.0, 0.0));
+					const FTransform PanelB(FRotator::ZeroRotator, FVector(2.0 * HalfPanelUu, 0.0, 0.0));
+
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelA)),
+						MakeSocket(2, TEXT("2000"), SecondarySocketAt(FarPanelC))};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(5, TEXT("2000"), SecondarySocketAt(PanelB)),
+						MakeSocket(6, TEXT("2000"), PrimarySocketAt(PanelB))};
+
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
+
+					TestTrue("still anchored", Candidate.IsSet());
+					TestEqual("nothing adopted", Candidate.Adoptions.Num(), 0);
+				});
+
+			It("never adopts a socket that is already connected",
+				[this, Tolerances, PanelA, PanelC]()
+				{
+					// A joint may host more than two panels, but joining a new part into an occupied
+					// one waits for Milestone 3's first-class joint. Until then an occupied socket is
+					// passed over, leaving a seam that is visibly open rather than silently a threesome.
+					const FTransform PanelB(FRotator::ZeroRotator, FVector(2.0 * HalfPanelUu, 0.0, 0.0));
+
+					TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelA)),
+						MakeSocket(2, TEXT("2000"), SecondarySocketAt(PanelC))};
+					Targets[1].bConnected = true;
+
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(5, TEXT("2000"), SecondarySocketAt(PanelB)),
+						MakeSocket(6, TEXT("2000"), PrimarySocketAt(PanelB))};
+
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
+
+					TestTrue("still anchored", Candidate.IsSet());
+					TestEqual("nothing adopted", Candidate.Adoptions.Num(), 0);
+				});
+
+			It("folds the part to close a second pair rather than to where it was held",
+				[this, Tolerances, PanelA]()
+				{
+					// DESIGN section 2.5's adopt-driven reading, and the one that makes a shell close.
+					// B is held flat, but the only way its far socket reaches the second target is to
+					// fold a quarter turn: the geometry already built decides the angle, not the wrist.
+					const FTransform PanelB(FRotator::ZeroRotator, FVector(2.0 * HalfPanelUu + 2.0, 0.0, 0.0));
+
+					// A socket standing directly over the anchor, one panel width up. Nothing but a
+					// fold puts B's far edge there.
+					const FTransform StandingTarget(FRotator(0.0, 180.0, 0.0),
+						FVector(HalfPanelUu, 0.0, 2.0 * HalfPanelUu));
+
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelA)),
+						MakeSocket(2, TEXT("2000"), StandingTarget)};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(5, TEXT("2000"), SecondarySocketAt(PanelB)),
+						MakeSocket(6, TEXT("2000"), PrimarySocketAt(PanelB))};
+
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
+
+					TestTrue("found an anchor", Candidate.IsSet());
+					TestEqual("one adoption", Candidate.Adoptions.Num(), 1);
+
+					// Held flat, the least-rotation reading would have left it flat and closed nothing.
+					TestEqual("folded to stand on the anchor", Candidate.SolvedPartTransform.GetLocation(),
+						FVector(HalfPanelUu, 0.0, HalfPanelUu), 1.0e-3f);
 				});
 		});
 }

@@ -487,6 +487,77 @@ void FPolySnapGeometrySpec::Define()
 				});
 		});
 
+	Describe("the adopt-driven dihedral",
+		[this]()
+		{
+			// A panel hinged about an anchor on its +X edge, with a second socket on the -X edge --
+			// the arrangement every closure is: one pair already mating, a second sweeping a circle
+			// about the shared edge until it lands on something.
+			const FPolySnapSocketBasis Anchor = FPolySnapGeometry::BasisFromTransform(FTransform::Identity);
+			const FTransform AnchorSocketLocal = PrimarySocketLocal();
+			const FVector SecondaryLocal(-HalfPanelUu, 0.0, 0.0);
+
+			const auto SecondaryAt = [AnchorSocketLocal, SecondaryLocal, Anchor](double Dihedral)
+			{
+				return FPolySnapGeometry::SolvePartTransform(AnchorSocketLocal, Anchor, EPolySnapPolarity::Aligned,
+					Dihedral)
+					.TransformPosition(SecondaryLocal);
+			};
+
+			It("recovers the angle that puts the secondary socket on its target",
+				[this, Anchor, AnchorSocketLocal, SecondaryLocal, SecondaryAt]()
+				{
+					// Closed form rather than a search, so the tolerance is float noise and not a
+					// step size.
+					for (const double Expected : {12.5, 90.0, 138.1897, 250.0, 359.0})
+					{
+						double Solved = 0.0;
+						double ResidualUu = 0.0;
+
+						TestTrue("solved",
+							FPolySnapGeometry::AdoptDihedralDegrees(AnchorSocketLocal, SecondaryLocal, Anchor,
+								EPolySnapPolarity::Aligned, SecondaryAt(Expected), Solved, ResidualUu));
+
+						TestEqual(FString::Printf(TEXT("dihedral at %g"), Expected), Solved, Expected, 1.0e-6);
+						TestEqual(FString::Printf(TEXT("residual at %g"), Expected), ResidualUu, 0.0, 1.0e-6);
+					}
+				});
+
+			It("reports what rotation could not close as the residual",
+				[this, Anchor, AnchorSocketLocal, SecondaryLocal, SecondaryAt]()
+				{
+					// Along the anchor's Tangent, which is the one direction hinging cannot move the
+					// secondary socket in. The angle is unaffected and the whole offset survives as
+					// the residual -- this is the number a connection records.
+					const double ExpectedDihedral = 138.1897;
+					const FVector AlongAxis = Anchor.Tangent * 3.0;
+
+					double Solved = 0.0;
+					double ResidualUu = 0.0;
+
+					TestTrue("solved",
+						FPolySnapGeometry::AdoptDihedralDegrees(AnchorSocketLocal, SecondaryLocal, Anchor,
+							EPolySnapPolarity::Aligned, SecondaryAt(ExpectedDihedral) + AlongAxis, Solved, ResidualUu));
+
+					TestEqual("dihedral", Solved, ExpectedDihedral, 1.0e-6);
+					TestEqual("residual", ResidualUu, 3.0, 1.0e-6);
+				});
+
+			It("declines a secondary socket lying on the anchor axis",
+				[this, Anchor, AnchorSocketLocal]()
+				{
+					// Such a socket sweeps a degenerate circle: every dihedral leaves it in the same
+					// place, so there is no angle to read off it and answering with one would be noise
+					// dressed as an answer.
+					double Solved = 0.0;
+					double ResidualUu = 0.0;
+
+					TestFalse("declined",
+						FPolySnapGeometry::AdoptDihedralDegrees(AnchorSocketLocal, FVector(HalfPanelUu, 0.0, 0.0),
+							Anchor, EPolySnapPolarity::Aligned, FVector(0.0, 50.0, 0.0), Solved, ResidualUu));
+				});
+		});
+
 	Describe("angle wrapping",
 		[this]()
 		{

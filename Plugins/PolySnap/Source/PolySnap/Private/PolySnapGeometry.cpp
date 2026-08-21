@@ -17,6 +17,14 @@ constexpr double TwistEpsilon = UE_DOUBLE_SMALL_NUMBER;
 	 * it means the same thing at every scale -- see IsUniformlyScaledRotation.
 	 */
 constexpr double ConformalTolerance = 1.0e-4;
+
+/**
+	 * The smallest across-axis radius, in Unreal units, that still names a direction.
+	 *
+	 * A socket this close to the anchor axis sweeps a circle small enough that the angle to any
+	 * point on it is numerical noise, so the adopt-driven solve declines rather than answering.
+	 */
+constexpr double AdoptRadiusEpsilon = 1.0e-3;
 }
 
 double FPolySnapGeometry::WrapDegrees(double Degrees)
@@ -217,6 +225,52 @@ double FPolySnapGeometry::NearestDihedralDegrees(const FTransform& HeldSocketLoc
 	OutRequiredRotationDegrees = AngleBetweenDegrees(SolvedRotation, CurrentSocketRotation);
 
 	return Dihedral;
+}
+
+bool FPolySnapGeometry::AdoptDihedralDegrees(const FTransform& HeldAnchorSocketLocal, const FVector& HeldSecondaryLocal,
+	const FPolySnapSocketBasis& Anchor, EPolySnapPolarity Polarity, const FVector& TargetSecondaryLocation,
+	double& OutDihedralDegrees, double& OutResidualUu)
+{
+	using namespace PolySnapGeometryPrivate;
+
+	OutDihedralDegrees = 0.0;
+	OutResidualUu = 0.0;
+
+	const FVector Axis = Anchor.Tangent.GetSafeNormal();
+	if (Axis.IsNearlyZero())
+	{
+		return false;
+	}
+
+	// Hinging the part is a rigid rotation of the whole placement about the world line through the
+	// anchor, so the pose at theta = 0 is enough to say where the secondary socket starts from.
+	const FTransform UnhingedPart = SolvePartTransform(HeldAnchorSocketLocal, Anchor, Polarity, 0.0);
+	const FVector Unhinged = UnhingedPart.TransformPosition(HeldSecondaryLocal);
+
+	const FVector FromAnchor = Unhinged - Anchor.Location;
+	const FVector ToTarget = TargetSecondaryLocation - Anchor.Location;
+
+	// Only the across-axis parts turn. The along-axis parts are the same at every theta, which is
+	// exactly why what they differ by cannot be closed and ends up in the residual.
+	const FVector HeldRadius = FVector::VectorPlaneProject(FromAnchor, Axis);
+	const FVector TargetRadius = FVector::VectorPlaneProject(ToTarget, Axis);
+
+	if (HeldRadius.Size() < AdoptRadiusEpsilon || TargetRadius.Size() < AdoptRadiusEpsilon)
+	{
+		return false;
+	}
+
+	OutDihedralDegrees = WrapDegrees(FMath::RadiansToDegrees(
+		FMath::Atan2(FVector::CrossProduct(HeldRadius, TargetRadius) | Axis, HeldRadius | TargetRadius)));
+
+	// Measured from the solved pose rather than assembled from the two leftovers. They agree to
+	// float precision, and this way the number cannot drift from what the placement actually does.
+	const FQuat Swing(Axis, FMath::DegreesToRadians(OutDihedralDegrees));
+	const FVector Hinged = Anchor.Location + Swing.RotateVector(FromAnchor);
+
+	OutResidualUu = FVector::Dist(Hinged, TargetSecondaryLocation);
+
+	return true;
 }
 
 void FPolySnapGeometry::SolveNearestPlacement(const FTransform& HeldSocketLocal, const FTransform& CurrentPartTransform,

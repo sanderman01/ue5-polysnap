@@ -250,6 +250,29 @@ enum class EPolySnapRejection : uint8
 };
 
 /**
+ * A secondary socket pair that closed on its own once the anchor was solved (DESIGN section 2.5).
+ *
+ * A placement gives the part exactly one transform but may gain several connections. The anchor is
+ * the pair the player is driving and is exact; every other pair that lands within tolerance after
+ * that solve is adopted into its joint, and records the gap it was adopted at. That gap is the
+ * project's measure of whether the panels are cut correctly.
+ */
+struct POLYSNAP_API FPolySnapAdoption
+{
+	/** ID of the socket on the part being placed. */
+	int32 HeldSocketId = INDEX_NONE;
+
+	/** The socket already in the world that it closed on. */
+	FPolySnapWorldSocket TargetSocket;
+
+	/** Distance between the two socket positions once the anchor's transform was applied. */
+	double GapUu = 0.0;
+
+	/** Angle between the two tangent lines at that moment, in degrees, ignoring polarity. */
+	double TangentAngleDegrees = 0.0;
+};
+
+/**
  * A socket pair that passed every test in DESIGN section 2.5, together with the placement it
  * implies. Exactly one candidate becomes the anchor, and the part's transform is solved from
  * the anchor and from nothing else.
@@ -282,6 +305,14 @@ struct POLYSNAP_API FPolySnapCandidate
 
 	/** The world transform the held part takes if this candidate is committed. */
 	FTransform SolvedPartTransform = FTransform::Identity;
+
+	/**
+	 * Every other socket pair that lands within tolerance once SolvedPartTransform is applied.
+	 *
+	 * Filled by FindAdoptions, after the solve and never before: an adoption is a consequence of
+	 * the anchor's transform, so it cannot be known while the anchor is still being chosen.
+	 */
+	TArray<FPolySnapAdoption> Adoptions;
 
 	[[nodiscard]] bool IsSet() const { return HeldSocket.Descriptor.IsValid() && TargetSocket.Descriptor.IsValid(); }
 };

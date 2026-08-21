@@ -23,9 +23,10 @@ struct FInputActionValue;
  *
  * While a part is held it is kinematic and locked to the view, because its transform is the
  * answer the snap solver produced and a simulating body would drift straight off it. On placement
- * the part is teleported to the solved transform, the connection and its residual are logged,
- * and only then does it start simulating again -- joined to its neighbour by a constraint that is
- * free about the shared edge and locked everywhere else.
+ * the part is teleported to the solved transform and handed to UPolySnapSubsystem::CommitPlacement,
+ * which records the anchor connection and every adopted one, then starts the part simulating
+ * again -- joined to its neighbours by constraints free about each shared edge and locked
+ * everywhere else.
  */
 UCLASS(ClassGroup = "PolySnap", meta = (BlueprintSpawnableComponent), DisplayName = "PolySnap Builder")
 class POLYSNAP_API UPolySnapBuilderComponent : public UActorComponent
@@ -85,9 +86,6 @@ private:
 
 	/** Runs the section 2.5 candidate search for the held part. */
 	void UpdateCandidate();
-
-	/** Records the connection on both parts and creates the hinge constraint. */
-	void CommitConnection(const FPolySnapCandidate& Candidate, double ResidualUu);
 
 	void DrawDebug() const;
 
