@@ -1,0 +1,63 @@
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapBuilderComponent.cpp
+  s_99198ce3ca0c91::t_8cbc8b44856f92 371-373,376,378,381
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapGeometrySpec.cpp
+  s_99198ce3ca0c91::t_e1724a533bf7ac 490-509,512-516,520-537,541-560
+  s_99198ce3ca0c91::t_ff00ab4577d205 510-511
+  s_99198ce3ca0c91::t_72602f098e69c4 517-519,538-540
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapTypes.h
+  s_99198ce3ca0c91::t_b52f4cb7430f33 253-274,309-315
+  s_99198ce3ca0c91::t_2b0e2f3d169d57 252,316
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapSnapQuery.cpp
+  s_99198ce3ca0c91::t_72602f098e69c4 69-70,218,316-317
+  s_99198ce3ca0c91::t_08e040504729cd 8-68,71-112,214-217,219-227,243-250,254-315,318-328
+  s_99198ce3ca0c91::t_dedbc57245b9ce 329
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapGeometry.cpp
+  s_99198ce3ca0c91::t_72602f098e69c4 230-232
+  s_99198ce3ca0c91::t_656447770c690c 20-27,233-273
+  s_99198ce3ca0c91::t_bb7d5389f563d6 274-275
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapSubsystem.cpp
+  s_99198ce3ca0c91::t_72602f098e69c4 150-151,157-161,182-185,336-337,353-354,367-368
+  s_99198ce3ca0c91::t_67e31b795d0026 5,9-10,13,16-57,132-149,152-156,162-181,186-265,270,272-279,281-292
+  s_99198ce3ca0c91::t_39bb7109085423 102-103
+  s_99198ce3ca0c91::t_fff65187c31d4d 293,295-335,338-352,355-366,369-373
+  s_99198ce3ca0c91::t_5c66c1a6399ad3 266-269,271,280
+  s_99198ce3ca0c91::t_113d4203ad202a 294
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapDebug.cpp
+  s_99198ce3ca0c91::t_fb09181187780a 275-292
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapSnapQuerySpec.cpp
+  s_99198ce3ca0c91::t_a80a4670c82ca2 284-286,291,310,324,326-328,331,338,348-352,354,360,367,369-378,385,391-392
+  s_99198ce3ca0c91::t_3c2d66f592015d 48-53,280-283,287-290,292-296,301-309,311-323,325,329-330,336-337,339-347,353,355,358-359,361-366,368,383-384,386-390,393
+  s_99198ce3ca0c91::t_72602f098e69c4 297-300,332-335,356-357,379-382
+  s_99198ce3ca0c91::t_38107acd75beb9 394
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapSettings.h
+  s_99198ce3ca0c91::t_39bb7109085423 77-96
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapSnapQuery.h
+  s_99198ce3ca0c91::t_457043dedf0838 21-35,72-76,89-90,96-118
+  s_99198ce3ca0c91::t_e1bb1924997fb8 119
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapBuilderComponent.h
+  s_99198ce3ca0c91::t_5cbd82fb0e0063 26-29
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapGeometry.h
+  s_99198ce3ca0c91::t_38bad504d0d823 155-182
+  s_99198ce3ca0c91::t_4b10bea74bbfc3 154
+Plugins/PolySnap/Source/PolySnap/Public/PolySnapSubsystem.h
+  s_99198ce3ca0c91::t_5c66c1a6399ad3 87-89
+  s_99198ce3ca0c91::t_a248623001c58a 12,55-86,90-103
+  s_99198ce3ca0c91::t_fff65187c31d4d 117-119
+  s_99198ce3ca0c91::t_11e0c87b9ec204 104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "a1afc7e9ff292c0681c0b85d998f645d1683656f",
+  "prompts": {},
+  "sessions": {
+    "s_99198ce3ca0c91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6d308852-ba85-47c3-851c-d0c2ab2cc199",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
