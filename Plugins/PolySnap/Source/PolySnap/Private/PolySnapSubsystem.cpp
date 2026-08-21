@@ -294,10 +294,16 @@ int32 UPolySnapSubsystem::CreateConstraintsForAllConnections()
 
 FString UPolySnapSubsystem::BuildAssemblyReport() const
 {
+	using namespace PolySnapSubsystemPrivate;
+
 	struct FReportedEdge
 	{
 		FString Description;
 		float ResidualMm = 0.0f;
+
+		/** The seam's distance right now, which under simulation is the strain the solver holds. */
+		double GapNowMm = 0.0;
+
 		bool bWasAnchor = false;
 	};
 
@@ -332,19 +338,31 @@ FString UPolySnapSubsystem::BuildAssemblyReport() const
 				continue;
 			}
 
+			// Measured now, not at placement. The two differ by exactly the strain the constraint
+			// solver is holding, which is why DESIGN section 5 wants the panel measurement taken
+			// with physics off -- and why the pair of numbers side by side says which is which.
+			const double GapNowMm =
+				FVector::Dist(SocketWorldTransformById(*Part, Connection.LocalSocketId).GetLocation(),
+					SocketWorldTransformById(*Other, Connection.OtherSocketId).GetLocation())
+				* UuToMm;
+
 			Edges.Add(FReportedEdge{FString::Printf(TEXT("%s socket %03d -> %s socket %03d"),
 														*GetNameSafe(Part->GetOwner()), Connection.LocalSocketId,
 														*GetNameSafe(Other->GetOwner()), Connection.OtherSocketId),
-				Connection.ResidualMm, Connection.bWasAnchor});
+				Connection.ResidualMm, GapNowMm, Connection.bWasAnchor});
 		}
 	}
 
 	int32 AnchoredCount = 0;
 	double ResidualSumMm = 0.0;
+	double GapSumMm = 0.0;
+	double WorstGapNowMm = 0.0;
 	for (const FReportedEdge& Edge : Edges)
 	{
 		AnchoredCount += Edge.bWasAnchor ? 1 : 0;
 		ResidualSumMm += Edge.ResidualMm;
+		GapSumMm += Edge.GapNowMm;
+		WorstGapNowMm = FMath::Max(WorstGapNowMm, Edge.GapNowMm);
 	}
 
 	// Worst first: the milestone number is the worst one, and the tail is where a build went wrong.
@@ -358,14 +376,17 @@ FString UPolySnapSubsystem::BuildAssemblyReport() const
 		return Report;
 	}
 
-	Report += FString::Printf(TEXT("\n  residual  worst %.4f mm   mean %.4f mm"), Edges[0].ResidualMm,
+	Report += FString::Printf(TEXT("\n  residual at placement   worst %.4f mm   mean %.4f mm"), Edges[0].ResidualMm,
 		ResidualSumMm / Edges.Num());
+	Report += FString::Printf(TEXT("\n  seam gap now            worst %.4f mm   mean %.4f mm"), WorstGapNowMm,
+		GapSumMm / Edges.Num());
 
 	const int32 ListedCount = FMath::Min(Edges.Num(), ReportedWorstEdgeCount);
 	for (int32 Index = 0; Index < ListedCount; ++Index)
 	{
-		Report += FString::Printf(TEXT("\n  %s  %s  %.4f mm"),
-			Index == 0 ? TEXT("worst:") : TEXT("      "), *Edges[Index].Description, Edges[Index].ResidualMm);
+		Report += FString::Printf(TEXT("\n  %s  %s  %.4f mm placed, %.4f mm now"),
+			Index == 0 ? TEXT("worst:")
+					   : TEXT("      "), *Edges[Index].Description, Edges[Index].ResidualMm, Edges[Index].GapNowMm);
 	}
 
 	return Report;

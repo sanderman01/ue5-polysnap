@@ -27,7 +27,7 @@
 		},
 		{
 			"Name": "PolySnapTests",
-			"Type": "Editor",
+			"Type": "DeveloperTool",
 			"LoadingPhase": "Default"
 		}
 	],
