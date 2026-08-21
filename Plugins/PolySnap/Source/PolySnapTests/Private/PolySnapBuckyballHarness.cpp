@@ -2,7 +2,9 @@
 
 #include "CollisionShape.h"
 #include "Components/MeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Containers/Ticker.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Actor.h"
@@ -16,6 +18,10 @@
 #include "PolySnapSnapQuery.h"
 #include "PolySnapSubsystem.h"
 #include "UObject/UObjectGlobals.h"
+
+#if WITH_EDITOR
+#include "StaticMeshCompiler.h"
+#endif
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -427,11 +433,60 @@ void ClearBuckyball(const TArray<FString>& Args, UWorld* World)
 	return Centre;
 }
 
+/**
+ * Blocks until the parts' own meshes have finished building.
+ *
+ * In the editor a static mesh is built asynchronously, and until that finishes it has no cooked
+ * collision. A part spawned inside that window gets a physics body with no shape, and the build
+ * landing afterwards rebuilds the body -- so if the shell is already simulating by then, every
+ * panel acquires its collision hull in the same tick, each one inside its neighbours', and the
+ * depenetration flings the whole thing apart at metres per second.
+ *
+ * The signature is the one DESIGN section 5 already records from a different cause, and it reads
+ * as a constraint network that cannot hold. What made it look intermittent rather than broken is
+ * that a mesh builds once per editor session, so only the first run after an editor start is ever
+ * hit; every run after it is measuring an already-built mesh.
+ */
+void WaitForPartMeshes(const TArray<UPolySnapConnectorComponent*>& Parts)
+{
+#if WITH_EDITOR
+	TArray<UStaticMesh*> Meshes;
+
+	for (const UPolySnapConnectorComponent* Part : Parts)
+	{
+		if (const UStaticMeshComponent* Component = Cast<UStaticMeshComponent>(Part->GetResolvedSocketMesh()))
+		{
+			if (UStaticMesh* Mesh = Component->GetStaticMesh())
+			{
+				Meshes.AddUnique(Mesh);
+			}
+		}
+	}
+
+	if (!Meshes.IsEmpty())
+	{
+		FStaticMeshCompilingManager::Get().FinishCompilation(Meshes);
+	}
+#endif
+}
+
 void SpawnBuckyball(const TArray<FString>& Args, UWorld* World)
 {
 	if (World == nullptr)
 	{
 		UE_LOG(LogPolySnap, Warning, TEXT("PolySnap.Test.Buckyball: no world."));
+		return;
+	}
+
+	// A part builds its socket cache in BeginPlay, which the editor world never calls. Spawning
+	// there gives parts that have a connector, no sockets and no resolved mesh -- which reads
+	// exactly like a part whose mesh reference failed to load, and is worth not mistaking for one.
+	if (!World->HasBegunPlay())
+	{
+		UE_LOG(LogPolySnap, Warning,
+			TEXT("PolySnap.Test.Buckyball: '%s' has not begun play, so nothing spawned into it would "
+				 "cache its sockets. Start PIE and run the command again."),
+				*World->GetName());
 		return;
 	}
 
@@ -478,6 +533,14 @@ void SpawnBuckyball(const TArray<FString>& Args, UWorld* World)
 			TEXT("PolySnap.Test.Buckyball: '%s' has no usable socket ring -- %d edge socket(s) on mesh '%s'."),
 				*PentagonClass->GetName(), Seed != nullptr ? Seed->GetSocketDescriptors().Num() : -1,
 				*GetNameSafe(Seed != nullptr ? Seed->GetResolvedSocketMesh() : nullptr));
+
+		// Left behind, the seed is a part in the level that the next run will find and measure
+		// against, so the failure would outlive the command that caused it.
+		if (Seed != nullptr)
+		{
+			Seed->GetOwner()->Destroy();
+		}
+
 		return;
 	}
 
@@ -656,6 +719,10 @@ void SpawnBuckyball(const TArray<FString>& Args, UWorld* World)
 	// their ideal positions, and that strain would otherwise be indistinguishable from panel
 	// error (DESIGN section 5).
 	const bool bPartCollision = CVarPartCollision.GetValueOnGameThread() != 0;
+
+	// Before the first body wakes, never after: a mesh finishing its build under a simulating
+	// shell is what tears the shell apart.
+	WaitForPartMeshes(Placed);
 
 	for (UPolySnapConnectorComponent* Part : Placed)
 	{
