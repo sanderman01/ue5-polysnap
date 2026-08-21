@@ -1,7 +1,7 @@
 # PolySnapSandbox
 
 An Unreal Engine 5.8 project (Linux) containing functionality related to object snapping and
-detection of enclosed volumes formed by connected pieces. A testbed for reusable plugin modules
+detection of enclosed volumes formed by connected parts. A testbed for reusable plugin modules
 for a game about building pressurised structures in microgravity, in orbit.
 
 > **Work in progress.** Nothing here is stable — the design is still moving, most of it is
@@ -26,38 +26,39 @@ place, and snap them together into airtight structures.
 The structures are **spherical and tubular pressure vessels** assembled from pentagons and
 hexagons, like a geodesic dome or a buckyball. Panels like those meet at irrational,
 non-orthogonal dihedral angles that no regular grid can express — which is why PolySnap does not
-use one. Instead of snapping to positions in a global grid, pieces snap to *each other*, through
+use one. Instead of snapping to positions in a global grid, parts snap to *each other*, through
 explicitly authored connection points (DESIGN [§1](DESIGN.md#1-the-idea)).
 
 ## Concepts
 
 | Concept | What it is |
 | --- | --- |
-| **Piece** | An actor carrying a `UPolySnapPieceComponent` — a hull panel, a strut, a hatch. Owns a set of sockets. |
-| **Socket** | A named, oriented connection point on a piece, with a type and a size. |
+| **Part** | An actor carrying a `UPolySnapConnectorComponent` — a hull panel, a strut, a hatch. Owns a set of sockets. |
+| **Connector** | The component itself. It is what joins its actor into an assembly, which is where the name comes from. |
+| **Socket** | A named, oriented connection point on a part, with a type and a size. |
 | **Joint** | A shared edge line in space. Hosts two or more sockets — a seam, or a T-junction. |
 | **Connection** | A socket's participation in a joint. |
-| **Assembly** | The connected graph of pieces and joints. |
-| **Weld group** | A set of pieces within an assembly that have been welded into one rigid body. |
+| **Assembly** | The connected graph of parts and joints. |
+| **Weld group** | A set of parts within an assembly that have been welded into one rigid body. |
 
 ## How PolySnap works
 
-**A piece is a component, not a base class.** PolySnap ships no actor class to inherit from, so a
-project keeps its own actor hierarchy and adds a `UPolySnapPieceComponent` to whatever it already
-has. To author a piece:
+**A part is a component, not a base class.** PolySnap ships no actor class to inherit from, so a
+project keeps its own actor hierarchy and adds a `UPolySnapConnectorComponent` to whatever it
+already has. To author a part:
 
 1. Export a static mesh whose sockets follow the `SOCKET_Edge_…` grammar
    ([CONVENTIONS.md](CONVENTIONS.md)).
 2. Make any actor — Blueprint or C++, any parent class — with a mesh component using that mesh.
-3. Add a **PolySnap Piece** component to it. Leave `Socket Mesh` empty and it takes the actor's
+3. Add a **PolySnap Connector** component to it. Leave `Socket Mesh` empty and it takes the actor's
    first mesh component; set it explicitly when the actor has more than one.
 4. Set up the mesh's collision and physics yourself. It must block the `PhysicsBody` channel to be
-   grabbable, and simulate to react physically. Tick `Start Anchored` instead for a fixed piece to
+   grabbable, and simulate to react physically. Tick `Start Anchored` instead for a fixed part to
    build against — PolySnap holds those kinematic and refuses to pick them up.
-5. Place it at scale 1. Sockets carry edge lengths, so a scaled piece's sockets lie about what they
+5. Place it at scale 1. Sockets carry edge lengths, so a scaled part's sockets lie about what they
    can meet, and the component says so at BeginPlay.
 
-(DESIGN [§2.11](DESIGN.md#211-a-piece-is-a-component-not-a-base-class))
+(DESIGN [§2.11](DESIGN.md#211-a-part-is-a-component-not-a-base-class))
 
 **Sockets are authored in Blender and named.** An edge socket is an empty at the midpoint of a
 panel edge, exported via FBX and imported as a static mesh socket. Its name carries its metadata:
@@ -83,25 +84,25 @@ the panel shapes and the angles fall out. (DESIGN
 directly to each other, so a T-junction where a bulkhead meets a hull seam is an ordinary joint of
 degree three. (DESIGN [§2.4](DESIGN.md#24-angles-are-emergent-and-joints-host-many-edges))
 
-**One anchor is exact; the rest are adopted.** A placement solves the piece's transform from
+**One anchor is exact; the rest are adopted.** A placement solves the part's transform from
 exactly one socket pair — the one the player is driving — and every other pair that lands within
 tolerance is adopted into its joint, recording the gap it closed at. That residual is the
 project's measure of whether the panels are cut correctly. (DESIGN
 [§2.5](DESIGN.md#25-compatibility-and-snapping))
 
-**The graph answers the structural questions.** Pieces and joints form a bipartite graph, and open
+**The graph answers the structural questions.** Parts and joints form a bipartite graph, and open
 edges, connectivity and enclosure are walks over it rather than geometric queries. PolySnap
 reports topology — what is connected, what is enclosed — and never models pressure or gas. (DESIGN
 [§2.8](DESIGN.md#28-the-assembly-graph))
 
-**Loose, then welded.** Connected pieces stay individual rigid bodies joined by physics
+**Loose, then welded.** Connected parts stay individual rigid bodies joined by physics
 constraints while under construction, so the structure flexes and can be pushed around. Welding
-merges a set into one rigid body and freezes its geometry, without merging the pieces' identities.
+merges a set into one rigid body and freezes its geometry, without merging the parts' identities.
 (DESIGN [§2.7](DESIGN.md#27-physics-and-welding))
 
 ## Milestones
 
-1. [x] **Two pieces snap edge-to-edge in PIE.** One piece type, one socket type — proves the socket
+1. [x] **Two parts snap edge-to-edge in PIE.** One part type, one socket type — proves the socket
    math.
 2. [ ] **A closed buckyball.** Hexes and pents assembling into a sealed truncated icosahedron, with the
    worst adoption residual across the ninety edges reported rather than eyeballed.

@@ -48,17 +48,17 @@ one *is*.
 
 | Role | Blender empty local | Unreal socket local | Meaning |
 | --- | --- | --- | --- |
-| **Outward** | **+X** | **+X** (Forward) | In the panel plane, perpendicular to the edge, away from the piece's centre. |
+| **Outward** | **+X** | **+X** (Forward) | In the panel plane, perpendicular to the edge, away from the part's centre. |
 | **Tangent** | **+Y** | **−Y** | Along the edge. |
 | **Normal** | **+Z** | **+Z** (Up) | The panel's surface normal. Arbitrary which face; see DESIGN §2.6. |
 
 **The Blender column is chosen for ease of authoring.** An empty with zero rotation is already
-a valid socket on the piece's +X edge, so authoring a socket is "place it, then yaw about Z"
+a valid socket on the part's +X edge, so authoring a socket is "place it, then yaw about Z"
 and nothing else.
 
 The Unreal column is what that becomes after import: the conversion negates Y — that is how a
 right-handed Blender basis is expressed in Unreal's left-handed one — so **Tangent lands on
-−Y**. Outward keeping +X is the part that matters at runtime, because every Unreal system that
+−Y**. Outward keeping +X is what matters at runtime, because every Unreal system that
 consumes a socket transform assumes a thing points along its local +X.
 
 **Tangent is −Y, not +Y.** Derive it through the sign, or every polarity test in the snapper
@@ -85,10 +85,10 @@ is a legitimate asset; the scale is dropped where the transform is first read, i
 scale — there is no single scale to drop, and a mirror flips the handedness the triad below
 depends on. §6 checks for exactly that.
 
-Do not read this as licence to scale a *piece*. That rule is the opposite one and unchanged
-(DESIGN §2.2): a placed piece is never scaled, because a panel at 1.5× has edges that no longer
+Do not read this as licence to scale a *part*. That rule is the opposite one and unchanged
+(DESIGN §2.2): a placed part is never scaled, because a panel at 1.5× has edges that no longer
 match the size tokens naming them. A socket's scale describes nothing, so it can say nothing
-false; a piece's scale describes the edges, so it can.
+false; a part's scale describes the edges, so it can.
 
 **Outward is the vector that sweeps as the dihedral changes**: at 180° (coplanar)
 `Outward_B == -Outward_A`, and folding rotates the two toward each other about the shared
@@ -117,7 +117,7 @@ So the mapping is configured in two places:
 | Where | Scope |
 | --- | --- |
 | `UPolySnapSettings::DefaultSocketAxes` (Project Settings → Plugins → PolySnap → Conventions) | The project's pipeline. Defaults to the table above. |
-| `Socket Axes` on a piece's `PolySnap Piece` component, behind its override tick-box | One piece whose mesh came from somewhere else. |
+| `Socket Axes` on a part's `PolySnap Connector` component, behind its override tick-box | One part whose mesh came from somewhere else. |
 
 **All three roles are declared, and all three are honoured exactly.** That is why the settings are
 strict about the third one: a socket frame is orthonormal with determinant +1, so naming `Outward`
@@ -131,20 +131,20 @@ That leaves **24 legal mappings** — six choices of `Outward`, four perpendicul
 `Normal` forced — which are exactly the 24 rotations of a cube.
 
 At runtime the mapping is applied once, where a socket transform is read off the mesh
-(`UPolySnapPieceComponent::GetSocketWorldTransform`), and everything downstream works in the
+(`UPolySnapConnectorComponent::GetSocketWorldTransform`), and everything downstream works in the
 canonical convention above. Nothing in the snapping math knows the setting exists.
 
 ---
 
 ## 3. Blender authoring
 
-### The piece
+### The part
 
 **Author panels flat, lying in the XY plane, surface normal along +Z.** Not standing up like a
 wall.
 
 Every edge socket has `Normal = +Z` (§2), so a flat panel makes every socket's Normal parallel to
-the piece's own +Z: sockets then differ **by rotation about Z only**. A hex panel becomes
+the part's own +Z: sockets then differ **by rotation about Z only**. A hex panel becomes
 verifiable by inspection — six sockets, `Roll 0 / Pitch 0`, yaw stepping by 60°, `Z = 0`. Author
 it standing and every socket carries a compound rotation instead, checkable only by geometry.
 
@@ -152,15 +152,15 @@ There is no "up" for a panel to stand relative to: the game has no gravity, and 
 buckyball ends up at every orientation there is.
 
 This is separate from the person-mnemonic in §2, which orients an *individual socket empty*. The
-piece itself has no facing direction.
+part itself has no facing direction.
 
-Non-planar pieces generalise the rule: the dominant surface lies in XY, and a linear piece such
+Non-planar parts generalise the rule: the dominant surface lies in XY, and a linear part such
 as a strut runs its long axis along +X.
 
 ### The origin
 
-- **Centroid, in-plane.** DESIGN §2.3 defines Outward relative to "the piece's centre", so the
-  origin should *be* that centre. It also makes a held piece tumble about itself.
+- **Centroid, in-plane.** DESIGN §2.3 defines Outward relative to "the part's centre", so the
+  origin should *be* that centre. It also makes a held part tumble about itself.
 - **Mid-thickness, never on a face.** Put `Z = 0` at the mid-surface and keep the panel symmetric
   about that mid-plane wherever the design allows.
 
@@ -171,13 +171,13 @@ so the hull surface stays put and only which face things are mounted on changes 
 thickness**, surfacing much later as drift when closing a buckyball and reading as a bug in the
 snap math.
 
-### Optional: the canonical piece frame
+### Optional: the canonical part frame
 
-> **Socket `001`'s Outward points along the piece's local +X** — that is, socket `001`'s empty
+> **Socket `001`'s Outward points along the part's local +X** — that is, socket `001`'s empty
 > has zero rotation (§2).
 
-This makes a piece's authored frame deterministic: panels of the same type become directly
-comparable and rotational variants trivial to diff. Without it, a piece's yaw about its own
+This makes a part's authored frame deterministic: panels of the same type become directly
+comparable and rotational variants trivial to diff. Without it, a part's yaw about its own
 normal is arbitrary — harmless, but arbitrary.
 
 House style, not a requirement of the snapping math. A project with its own idea of a canonical
@@ -222,22 +222,22 @@ the N-panel before exporting.
 The **empty's rotation is the data** — an empty has no mesh data to bake it into, so whatever is
 in the N-panel is what ships. Hence **Apply Transform must stay off** (§4).
 
-### Several pieces in one file
+### Several parts in one file
 
 Authoring a whole panel family in one `.blend` is worth doing: it is the only cheap way to
 guarantee that a hex and a pent genuinely share an edge length rather than nearly sharing one.
 Two rules make it safe.
 
-**Every piece keeps an identity transform, stacked at the origin.** Do not lay pieces out side
+**Every part keeps an identity transform, stacked at the origin.** Do not lay parts out side
 by side. Unreal bakes the FBX node transform into the vertices (§5), so a pent authored at
 `(5, 0, 0)` imports with its geometry 500 uu off the asset origin while its parented sockets
 stay correct in local space. The origin is then no longer the centroid, §6's inward-Outward
 warning starts firing on assets that are actually fine, and every placement is offset — which
-reads as a bug in the snap math and is not. Work on one piece at a time with collection
+reads as a bug in the snap math and is not. Work on one part at a time with collection
 visibility or local view (`/`).
 
-**One collection per piece.** Authoring tails are suffixes, so a file's socket names interleave
-alphabetically in the outliner and the collection is what gives a piece visual grouping. It also
+**One collection per part.** Authoring tails are suffixes, so a file's socket names interleave
+alphabetically in the outliner and the collection is what gives a part visual grouping. It also
 makes "select this mesh and its empties" a single action, which matters because an export that
 drops the empties **succeeds silently** (§4).
 
@@ -257,8 +257,8 @@ Two things the defaults do not decide:
 - **The export must contain the empties.** Object Types defaults to all types, which is
   correct — but an export that drops them **succeeds silently** and lands a panel with no
   sockets at all.
-- **One file per piece.** With a panel family in one `.blend` (§3), either tick **Limit to
-  Selected Objects** or use **Batch Mode → Collection**, which fits the one-collection-per-piece
+- **One file per part.** With a panel family in one `.blend` (§3), either tick **Limit to
+  Selected Objects** or use **Batch Mode → Collection**, which fits the one-collection-per-part
   rule. Neither touches axes or units; batch mode's interaction with the rest is unconfirmed, so
   check it on the calibration asset (§7) before relying on it.
 
@@ -274,7 +274,7 @@ describe.
 Two consequences of the defaults are worth naming:
 
 - **Transform Vertex to Absolute bakes the FBX node transform into the vertices.** Harmless
-  when every piece is authored at identity, and the reason §3 insists on it rather than merely
+  when every part is authored at identity, and the reason §3 insists on it rather than merely
   recommending it.
 - **Auto-generated collision is the one thing to switch off** per asset. Panels need authored
   collision; a generated hull will not respect an edge profile (DESIGN §2.4). That is a content
@@ -297,7 +297,7 @@ fixed it can also check geometry against the name, which is where mistakes in th
 settings actually surface — at import, never as a runtime surprise.
 
 Name parsing has one ordering rule worth repeating here: **strip the authoring tail before
-checking ID uniqueness.** The other way round, two pieces sharing a `.blend` fail for an error
+checking ID uniqueness.** The other way round, two parts sharing a `.blend` fail for an error
 neither of them has. Sockets not named `Edge_*` belong to some other system and are skipped
 without a diagnostic (DESIGN §2.2).
 
@@ -323,17 +323,17 @@ Everything else is a **warning** a project that authors differently can disable:
 
 | Check | Setting | Catches |
 | --- | --- | --- |
-| `Outward · (SocketPos − MeshCentroid) > 0` | `bWarnOnInwardOutward` | Outward pointing into the piece — a 180° slip. Also catches swapped Outward/Tangent roles, since an Outward running along the edge drives the dot product to ≈ 0. A warning rather than an error because a concave outline can fail it legitimately. |
-| On a planar piece, every socket Normal ∥ the piece's local +Z | `bWarnOnNonCanonicalPieceFrame` | A panel authored standing, or a socket with stray roll. |
-| On a planar piece, socket `Z` ≈ the piece's mid-thickness | `bWarnOnSocketOffMidPlane` | An origin on a face — the flip-displacement trap (§3). Scoped to planar pieces, so it sits in the same tier as the convention it depends on. |
-| Socket `001`'s Outward ∥ the piece's local +X | `bWarnOnUnalignedPrimarySocket` | A piece not following the canonical-frame rule (§3). |
+| `Outward · (SocketPos − MeshCentroid) > 0` | `bWarnOnInwardOutward` | Outward pointing into the part — a 180° slip. Also catches swapped Outward/Tangent roles, since an Outward running along the edge drives the dot product to ≈ 0. A warning rather than an error because a concave outline can fail it legitimately. |
+| On a planar part, every socket Normal ∥ the part's local +Z | `bWarnOnNonCanonicalPartFrame` | A panel authored standing, or a socket with stray roll. |
+| On a planar part, socket `Z` ≈ the part's mid-thickness | `bWarnOnSocketOffMidPlane` | An origin on a face — the flip-displacement trap (§3). Scoped to planar parts, so it sits in the same tier as the convention it depends on. |
+| Socket `001`'s Outward ∥ the part's local +X | `bWarnOnUnalignedPrimarySocket` | A part not following the canonical-frame rule (§3). |
 | A socket's authoring tail is purely numeric | `bWarnOnNumericAuthoringTail` | Blender assigned the tail itself, so a name collision went unnoticed. Benign, but the `_001` it imports as reads like the `ID` field. |
 
 All of them live in PolySnap's own `UDeveloperSettings`, not in project config — the plugin
 ships its conventions with it and a downstream project overrides them locally.
 
 **The validator checks against `DefaultSocketAxes` only.** It runs from an import hook, on a
-`UStaticMesh`, with no piece component to ask — so a mesh whose piece overrides the socket axis
+`UStaticMesh`, with no part component to ask — so a mesh whose part overrides the socket axis
 mapping (§2) is checked against the project's convention rather than its own. A `Tangent` sign
 difference costs nothing, because the edge-length measurement is a max minus a min along that
 axis and the sign cancels; an `Outward` sign difference or an `Outward`/`Tangent` swap measures a
@@ -402,7 +402,7 @@ came from the pipeline and nothing else. Author per §3, export per §4, import 
    socket, and PolySnap ignores it without a diagnostic (DESIGN §2.2). Confirms the plugin can
    share a mesh with another system, which is the whole basis for equipment living elsewhere.
 7. **Batch export.** Blender's FBX exporter has a **Batch Mode → Collection** that writes one
-   file per collection, the natural fit for §3's one-collection-per-piece rule. Its interaction
+   file per collection, the natural fit for §3's one-collection-per-part rule. Its interaction
    with *Limit to Selected Objects* is unconfirmed (§4); check it here, and if it behaves, use
    it.
 
