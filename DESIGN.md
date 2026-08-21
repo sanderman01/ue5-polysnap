@@ -359,8 +359,22 @@ residual of exactly zero — so ranking closures by residual makes that degenera
 intended one whenever both are available, and an assembly built that way stacks panels rather than
 closing them. It is not a rare case. It cost the buckyball its twelfth face, and nothing
 placed after that had anything to snap to. Since any closure inside the tolerance is geometrically acceptable, the
-question left is which one the builder was aiming at, and rotation is what answers it. What this
-does *not* cover is a coincident placement that is the only closure on offer (§7).
+question left is which one the builder was aiming at, and rotation is what answers it.
+
+**A coincident fold is not a placement, and is refused outright.** Ranking only settles the
+degenerate answer while a sensible one is also on offer. Two panels meeting along their first
+shared edge have no second one: folding the held panel onto the placed one is the *only* closure
+there is, and the coplanar answer the builder is asking for closes nothing, so it never enters the
+adopt-driven search at all. **θ within `MinDihedralDegrees` of 0 or 360 is therefore inadmissible
+on both paths** — 5°, against a flat seam of 180° and a truncated icosahedron's 138° and 143°.
+What makes this decidable without the collision query the snapper has no business making (§7) is
+that it is a statement about sockets: at θ = 0 the mated `Outward` *is* the anchor's `Outward`, so
+the held panel lies on the side of the shared edge the target part is already on. The adopt-driven
+search **skips** such a θ rather than declining on it — a degenerate closure must not suppress a
+sensible one found later in the sweep — and with nothing else on offer the search comes back empty
+and the player-driven reading answers. Should that reading also be coincident, the pair is
+**rejected**, with a reason the readout names: a player holding one panel over another is not
+aiming at a seam, and a seam that refuses to close is a better answer than two panels in one place.
 
 **Adoption takes unconnected target sockets only.** A joint may host more than two panels (§2.4),
 but joining a new part into an *occupied* joint needs the first-class joint of Milestone 3 — until
@@ -607,11 +621,15 @@ Marked explicitly so nobody builds on them as though they were settled.
   misaligned panels are welded into the graph as though they had closed. Its value is now 2 cm and Milestone
   2 says nothing against it. A shell that closes three hundred times inside the tolerance
   exercises neither edge of the range, so what counts as *too* loose is still unknown.
-- **Coincident placements.** A closure that folds a part flat onto a part already placed is
-  degenerate, and §2.5's least-rotation ranking only stops it winning when a sensible closure is
-  also available. When it is the only closure on offer it is still taken. Whether a placement
-  should be refused for landing a part where a part already is — and how "already is" is decided
-  without a collision query the snapper has no business making — is undesigned.
+  `MinDihedralDegrees` (§2.5) is a fourth and the least exercised of them: at 5° it sits nowhere
+  near any angle a shell has asked for, so nothing built so far says where it belongs. A part that
+  wants a genuinely sharp fold — a wedge, a spine — would be the first thing to press on it.
+- **Coincident placements.** Settled for a part that shares an edge with the one it would land
+  on: §2.5 refuses a fold within `MinDihedralDegrees` of fully closed, on both paths, and decides
+  it from the two socket bases rather than from a collision query. What stays open is the case
+  with no shared edge — a part solved into a space some *other* part occupies, which no socket
+  reads and which does need a query of the world. Milestone 3's assembly graph is the place to
+  ask it from, since by then there is something that knows what is built.
 - **Anchor selection.** The anchor is exact and every adopted connection carries the residual, so
   which pair anchors decides where the error lands. Whether the player-driven pair is always the
   right anchor is unexplored.
