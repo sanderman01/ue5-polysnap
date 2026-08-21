@@ -43,41 +43,7 @@ constexpr uint64 ReadoutKeyHeld = 0x504F4C59;
 constexpr uint64 ReadoutKeyCandidate = 0x504F4C5A;
 constexpr uint64 ReadoutKeyPlacement = 0x504F4C5B;
 
-void SetPieceSimulating(UPolySnapPieceComponent* Piece, bool bSimulate)
-{
-	if (Piece == nullptr)
-	{
-		return;
-	}
-
-	// APolySnapPiece knows about anchoring, so prefer its own answer where there is one.
-	if (APolySnapPiece* SnapPiece = Cast<APolySnapPiece>(Piece->GetOwner()))
-	{
-		SnapPiece->SetSimulating(bSimulate);
-	}
-	// UMeshComponent is already a UPrimitiveComponent, so no cast is involved.
-	else if (UMeshComponent* Mesh = Piece->GetResolvedSocketMesh())
-	{
-		Mesh->SetSimulatePhysics(bSimulate);
-	}
-
-	if (!bSimulate)
-	{
-		return;
-	}
-
-	// A carried piece is kinematic and is teleported to the solved transform every frame, so the
-	// solver has been deriving a velocity from the player's own movement. Handing the body back to
-	// the simulation still carrying it is what sends a just-placed piece wandering off: the player
-	// put it there, so it starts at rest and damping has nothing to bleed off.
-	UMeshComponent* Mesh = Piece->GetResolvedSocketMesh();
-	if (Mesh != nullptr && Mesh->IsSimulatingPhysics())
-	{
-		Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
-		Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
-	}
 }
-} // namespace PolySnapBuilderPrivate
 
 UPolySnapBuilderComponent::UPolySnapBuilderComponent()
 {
@@ -300,7 +266,7 @@ bool UPolySnapBuilderComponent::GrabPieceUnderCrosshair()
 	}
 
 	HeldPiece = Piece;
-	PolySnapBuilderPrivate::SetPieceSimulating(HeldPiece, false);
+	HeldPiece->SetSimulating(false);
 
 	// Carry the piece at the orientation it was already in, expressed relative to the view, so
 	// picking something up never jerks it round. Roll is then the player's to add.
@@ -324,7 +290,7 @@ void UPolySnapBuilderComponent::DropHeldPiece()
 		return;
 	}
 
-	PolySnapBuilderPrivate::SetPieceSimulating(HeldPiece, true);
+	HeldPiece->SetSimulating(true);
 
 	if (UPolySnapSubsystem* Subsystem = UPolySnapSubsystem::Get(this))
 	{
@@ -462,7 +428,7 @@ void UPolySnapBuilderComponent::CommitConnection(const FPolySnapCandidate& Candi
 
 	// Simulation is enabled before the constraint is created, because the constraint needs live
 	// body instances on both sides to bind to.
-	PolySnapBuilderPrivate::SetPieceSimulating(HeldPieceComponent, true);
+	HeldPieceComponent->SetSimulating(true);
 
 	UMeshComponent* HeldMesh = HeldPieceComponent->GetResolvedSocketMesh();
 	UMeshComponent* TargetMesh = TargetPieceComponent->GetResolvedSocketMesh();

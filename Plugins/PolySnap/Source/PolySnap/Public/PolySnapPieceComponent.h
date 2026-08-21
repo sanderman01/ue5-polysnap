@@ -65,6 +65,25 @@ public:
 	/** Reparses the mesh's sockets. Called at BeginPlay; public so an editor tool can refresh. */
 	void RebuildSocketCache();
 
+	/**
+	 * Applies UPolySnapSettings' damping and sleep thresholds to this piece's mesh body.
+	 *
+	 * Lives here rather than on APolySnapPiece because this component is what makes an actor a
+	 * piece: a plain Blueprint actor with a mesh and this component is a piece in every other
+	 * respect, and it needs the same physics or it drifts away in zero gravity. Called at
+	 * BeginPlay, whenever the settings change, and whenever the piece re-enters the simulation.
+	 */
+	void ApplyPhysicsSettings();
+
+	/**
+	 * Hands the piece to the simulation, or takes it out so it can be carried.
+	 *
+	 * The one place that knows what handing a piece back involves: an anchored APolySnapPiece
+	 * refuses, the physics settings are re-applied, and the body starts at rest rather than
+	 * carrying the velocity the solver derived while the player walked it into place.
+	 */
+	void SetSimulating(bool bSimulate);
+
 	/** Every socket on this piece, resolved into world space, appended to OutSockets. */
 	void AppendWorldSockets(TArray<FPolySnapWorldSocket>& OutSockets) const;
 
@@ -110,4 +129,7 @@ private:
 
 	/** AxisCorrection of the effective convention, resolved in RebuildSocketCache and reused. */
 	FQuat SocketAxisCorrection = FQuat::Identity;
+
+	/** Subscription to UPolySnapSettings, so a retune reaches a piece that is already simulating. */
+	FDelegateHandle SettingsChangedHandle;
 };

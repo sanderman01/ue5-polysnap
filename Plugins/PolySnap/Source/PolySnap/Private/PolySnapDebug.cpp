@@ -3,6 +3,7 @@
 #include "PolySnapDebug.h"
 
 #include "Components/MeshComponent.h"
+#include "Containers/Ticker.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -93,7 +94,46 @@ const FColor JointColour = FColor(220, 60, 220);
  * This prints both sides, plus the state and speed that say whether the piece is still being
  * driven by something.
  */
-void DumpPhysics(UWorld* World)
+void DumpPhysicsOnce(UWorld* World);
+
+/**
+ * PolySnap.DumpPhysics [seconds] -- one dump, or one every half second for that long.
+ *
+ * The timed form is the one that answers "does a nudged piece settle": a single sample cannot
+ * tell a piece that is slowing down from one that is not.
+ */
+void DumpPhysics(const TArray<FString>& Args, UWorld* World)
+{
+	DumpPhysicsOnce(World);
+
+	const double WatchSeconds = Args.Num() > 0 ? FCString::Atod(*Args[0]) : 0.0;
+	if (WatchSeconds <= 0.0)
+	{
+		return;
+	}
+
+	// A ticker rather than a world timer, so the sampling interval is wall clock and a dump still
+	// lands if the world is paused -- a paused piece that looks stopped is exactly the confusion
+	// this is meant to resolve.
+	constexpr float SampleInterval = 0.5f;
+	FTSTicker::GetCoreTicker().AddTicker(
+		FTickerDelegate::CreateLambda(
+			[WeakWorld = TWeakObjectPtr<UWorld>(World), Deadline = FPlatformTime::Seconds() + WatchSeconds](float)
+			{
+				UWorld* TickWorld = WeakWorld.Get();
+				if (TickWorld == nullptr)
+				{
+					return false;
+				}
+
+				DumpPhysicsOnce(TickWorld);
+
+				return FPlatformTime::Seconds() < Deadline;
+			}),
+		SampleInterval);
+}
+
+void DumpPhysicsOnce(UWorld* World)
 {
 	const UPolySnapSubsystem* Subsystem = World != nullptr ? World->GetSubsystem<UPolySnapSubsystem>() : nullptr;
 	if (Subsystem == nullptr)
@@ -187,9 +227,60 @@ void SetDamping(const TArray<FString>& Args)
 											  : TEXT("normal"), Settings->PieceSleepThresholdMultiplier);
 }
 
-static FAutoConsoleCommandWithWorld CmdDumpPhysics(TEXT("PolySnap.DumpPhysics"),
-	TEXT("Logs what each PolySnap piece's body actually has: state, speed, damping, sleep multiplier."),
-		FConsoleCommandWithWorldDelegate::CreateStatic(&DumpPhysics));
+/**
+ * PolySnap.Nudge [speed] -- hands every piece to the simulation and shoves it.
+ *
+ * The behaviour this project cares about most is what a piece does after the player lets go, and
+ * that is otherwise only reachable by playing. This reproduces it in one command, so a settling
+ * time can be measured in a headless session instead of estimated by eye.
+ */
+void Nudge(const TArray<FString>& Args, UWorld* World)
+{
+	UPolySnapSubsystem* Subsystem = World != nullptr ? World->GetSubsystem<UPolySnapSubsystem>() : nullptr;
+	if (Subsystem == nullptr)
+	{
+		UE_LOG(LogPolySnap, Warning, TEXT("PolySnap.Nudge: no PolySnap subsystem in this world."));
+		return;
+	}
+
+	const double Speed = Args.Num() > 0 ? FCString::Atod(*Args[0]) : 200.0;
+	int32 NudgedCount = 0;
+
+	for (const TWeakObjectPtr<UPolySnapPieceComponent>& WeakPiece : Subsystem->GetRegisteredPieces())
+	{
+		UPolySnapPieceComponent* Piece = WeakPiece.Get();
+		if (Piece == nullptr)
+		{
+			continue;
+		}
+
+		Piece->SetSimulating(true);
+
+		UMeshComponent* Mesh = Piece->GetResolvedSocketMesh();
+		if (Mesh == nullptr || !Mesh->IsSimulatingPhysics())
+		{
+			continue;
+		}
+
+		// Deterministic rather than random: two runs of the same test should shove the same piece
+		// the same way, or a settling time cannot be compared against the last one.
+		const double Phase = NudgedCount * 1.7;
+		Mesh->SetPhysicsLinearVelocity(FVector(FMath::Cos(Phase), FMath::Sin(Phase), 0.35) * Speed);
+		Mesh->SetPhysicsAngularVelocityInDegrees(FVector(0.4, FMath::Sin(Phase), FMath::Cos(Phase)) * Speed);
+		++NudgedCount;
+	}
+
+	UE_LOG(LogPolySnap, Display, TEXT("PolySnap.Nudge: shoved %d piece(s) at %.0f cm/s."), NudgedCount, Speed);
+}
+
+static FAutoConsoleCommandWithWorldAndArgs CmdDumpPhysics(TEXT("PolySnap.DumpPhysics"),
+	TEXT("PolySnap.DumpPhysics [seconds]. Logs what each piece's body actually has: state, speed, ")
+		TEXT("damping, sleep multiplier. With a duration, samples every half second so a piece can be ")
+			TEXT("watched settling."), FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&DumpPhysics));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdNudge(TEXT("PolySnap.Nudge"),
+	TEXT("PolySnap.Nudge [speed]. Hands every piece to the simulation and shoves it, to watch it settle."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&Nudge));
 
 static FAutoConsoleCommand CmdSetDamping(TEXT("PolySnap.SetDamping"),
 	TEXT("PolySnap.SetDamping <linear> <angular> [sleepMultiplier]. Applies to every live piece at once."),

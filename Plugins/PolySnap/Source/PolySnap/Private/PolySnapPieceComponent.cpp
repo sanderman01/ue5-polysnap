@@ -7,8 +7,11 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
 #include "GameFramework/Actor.h"
+#include "Physics/PhysicsInterfaceCore.h"
+#include "PhysicsEngine/BodyInstance.h"
 #include "PolySnap.h"
 #include "PolySnapGeometry.h"
+#include "PolySnapPiece.h"
 #include "PolySnapSettings.h"
 #include "PolySnapSocketName.h"
 #include "PolySnapSubsystem.h"
@@ -39,10 +42,92 @@ void UPolySnapPieceComponent::BeginPlay()
 	{
 		Subsystem->RegisterPiece(this);
 	}
+
+	ApplyPhysicsSettings();
+
+	// Damping is a feel value, and feel values are found by trying them. Re-applying on every
+	// settings change means a value can be changed in Project Settings, or with PolySnap.SetDamping,
+	// while PIE runs and felt immediately, instead of costing a restart per attempt.
+	SettingsChangedHandle =
+		UPolySnapSettings::OnSettingsChanged().AddWeakLambda(this, [this]() { ApplyPhysicsSettings(); });
+}
+
+void UPolySnapPieceComponent::ApplyPhysicsSettings()
+{
+	UMeshComponent* Mesh = ResolvedSocketMesh;
+	if (Mesh == nullptr)
+	{
+		return;
+	}
+
+	const UPolySnapSettings& Settings = UPolySnapSettings::Get();
+	Mesh->SetLinearDamping(Settings.PieceLinearDamping);
+	Mesh->SetAngularDamping(Settings.PieceAngularDamping);
+
+	FBodyInstance* Body = Mesh->GetBodyInstance();
+	if (Body == nullptr)
+	{
+		return;
+	}
+
+	// Damping is exponential decay: it approaches zero velocity and never arrives, so a released
+	// piece keeps crawling long after it looks stopped. What ends the motion is Chaos deciding the
+	// piece's island is asleep, which it does once every body in it has stayed under a linear and
+	// an angular velocity threshold for a run of ticks. Custom scales both thresholds by the
+	// multiplier below -- higher means a faster-moving piece already counts as at rest, so it
+	// sleeps sooner -- and a sleeping island is no longer solved at all, which is what keeps a
+	// large structure cheap.
+	Body->SleepFamily = Settings.bUsePieceSleepThreshold ? ESleepFamily::Custom : ESleepFamily::Normal;
+	Body->CustomSleepThresholdMultiplier = Settings.PieceSleepThresholdMultiplier;
+
+	// FBodyInstance only reads those two when it creates the physics body, so a live piece needs
+	// the value pushed onto its particle by hand. A no-op on a body that does not exist yet, which
+	// is fine: that body will read the fields set above when it is created.
+	FPhysicsCommand::ExecuteWrite(Body->GetPhysicsActor(),
+		[Multiplier = Body->GetSleepThresholdMultiplier()](const FPhysicsActorHandle& Actor)
+		{ FPhysicsInterface::SetSleepThresholdMultiplier_AssumesLocked(Actor, Multiplier); });
+}
+
+void UPolySnapPieceComponent::SetSimulating(bool bSimulate)
+{
+	UMeshComponent* Mesh = ResolvedSocketMesh;
+	if (Mesh == nullptr)
+	{
+		return;
+	}
+
+	// APolySnapPiece knows about anchoring, so prefer its own answer where there is one.
+	if (APolySnapPiece* SnapPiece = Cast<APolySnapPiece>(GetOwner()))
+	{
+		SnapPiece->SetSimulating(bSimulate);
+	}
+	else
+	{
+		Mesh->SetSimulatePhysics(bSimulate);
+	}
+
+	if (!bSimulate || !Mesh->IsSimulatingPhysics())
+	{
+		return;
+	}
+
+	// The body may have been created after BeginPlay, or created kinematic and only now made
+	// dynamic, so the settings are re-applied at the one moment they matter.
+	ApplyPhysicsSettings();
+
+	// A carried piece is kinematic and is teleported to the solved transform every frame, so the
+	// solver has been deriving a velocity from the player's own movement. Handing the body back to
+	// the simulation still carrying it is what sends a just-placed piece wandering off: the player
+	// put it there, so it starts at rest and damping has nothing to bleed off.
+	Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+	Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
 }
 
 void UPolySnapPieceComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	UPolySnapSettings::OnSettingsChanged().Remove(SettingsChangedHandle);
+	SettingsChangedHandle.Reset();
+
 	if (UPolySnapSubsystem* Subsystem = UPolySnapSubsystem::Get(this))
 	{
 		Subsystem->UnregisterPiece(this);
