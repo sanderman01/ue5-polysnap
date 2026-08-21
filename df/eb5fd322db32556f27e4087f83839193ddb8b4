@@ -1,0 +1,23 @@
+Plugins/PolySnap/Source/PolySnap/Private/PolySnapSnapQuery.cpp
+  s_99198ce3ca0c91::t_aa9ea1836cf04c 115-117
+  s_99198ce3ca0c91::t_5b861262fe456c 60-62,64-73,84-85,106-107,112-114,118-119,121,125,240-242
+  s_99198ce3ca0c91::t_18101436d2b423 81-82
+Plugins/PolySnap/Source/PolySnapTests/Private/PolySnapSnapQuerySpec.cpp
+  s_99198ce3ca0c91::t_ba19c92ec57be3 366-398
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "dfeb5fd322db32556f27e4087f83839193ddb8b4",
+  "prompts": {},
+  "sessions": {
+    "s_99198ce3ca0c91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6d308852-ba85-47c3-851c-d0c2ab2cc199",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
