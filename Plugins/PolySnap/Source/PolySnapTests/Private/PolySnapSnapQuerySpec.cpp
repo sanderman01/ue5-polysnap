@@ -363,6 +363,39 @@ void FPolySnapSnapQuerySpec::Define()
 					TestEqual("nothing adopted", Candidate.Adoptions.Num(), 0);
 				});
 
+			It("prefers the nearer closure to a nearer-fitting one that folds the part onto a panel",
+				[this, Tolerances, PanelA]()
+				{
+					// The case that stops a shell closing at all. Folding a panel flat onto a panel
+					// already placed lands every one of its sockets on that panel's, at a residual of
+					// exactly zero -- so ranking closures by residual makes the degenerate answer beat
+					// the intended one every time, and the assembly stacks instead of closing.
+					const FTransform PanelB(FRotator::ZeroRotator, FVector(2.0 * HalfPanelUu + 2.0, 0.0, 0.0));
+
+					// The intended closure: a socket standing over the anchor, missing by a hair.
+					const FTransform StandingTarget(FRotator(0.0, 180.0, 0.0),
+						FVector(HalfPanelUu, 0.0, 2.0 * HalfPanelUu + 0.05));
+
+					// The degenerate one: exactly where B's far socket lands if B folds onto A.
+					const FTransform StackedTarget(FRotator::ZeroRotator, FVector(-HalfPanelUu, 0.0, 0.0));
+
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"),
+						PrimarySocketAt(PanelA)), MakeSocket(2, TEXT("2000"), StandingTarget),
+						MakeSocket(3, TEXT("2000"), StackedTarget)};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(5, TEXT("2000"),
+						SecondarySocketAt(PanelB)), MakeSocket(6, TEXT("2000"), PrimarySocketAt(PanelB))};
+
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
+
+					TestTrue("found an anchor", Candidate.IsSet());
+
+					// A quarter turn away rather than a half turn, and the seam it closes is the one
+					// that leaves the panel somewhere a panel is not already.
+					TestEqual("folded to stand on the anchor, not onto the panel",
+						Candidate.SolvedPartTransform.GetLocation(), FVector(HalfPanelUu, 0.0, HalfPanelUu), 1.0f);
+				});
+
 			It("folds the part to close a second pair rather than to where it was held",
 				[this, Tolerances, PanelA]()
 				{

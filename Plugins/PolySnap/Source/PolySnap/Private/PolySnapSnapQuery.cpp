@@ -57,9 +57,20 @@ constexpr EPolySnapPolarity Polarities[] = {EPolySnapPolarity::Aligned, EPolySna
 	return FPolySnapGeometry::AngleBetweenDegrees(SolvedRotation, CurrentSocketRotation);
 }
 
+/** Below this, two placements are equally far from where the part is held and the residual decides. */
+constexpr double RotationTieDegrees = 1.0e-3;
+
 /**
- * DESIGN section 2.5 step 1: the theta and polarity that close some second socket pair, searched
- * over every secondary pair and both polarities, smallest residual winning.
+ * DESIGN section 2.5 step 1: the theta and polarity that close some second socket pair.
+ *
+ * Searched over every secondary pair and both polarities. Where more than one closes, the one
+ * nearest the pose the part is already in wins, and only a tie there is settled by the residual.
+ *
+ * That ranking is not a detail. Folding a panel flat onto a panel already placed closes every one
+ * of its sockets at a residual of exactly zero, so ranking by residual alone makes the degenerate
+ * answer beat the intended one every time, and a shell assembled that way stacks its panels
+ * instead of closing. Any closure inside AdoptionDistanceUu is geometrically acceptable, so the
+ * question left is which of them the builder was aiming at -- and that is the nearest one.
  *
  * @return False when no secondary pair comes within AdoptionDistanceUu, which is the caller's cue
  *         to fall back to the player-driven reading.
@@ -67,9 +78,11 @@ constexpr EPolySnapPolarity Polarities[] = {EPolySnapPolarity::Aligned, EPolySna
 [[nodiscard]] bool SolveAdoptDrivenPlacement(const TArray<FPolySnapWorldSocket>& HeldSockets,
 	const TArray<FPolySnapWorldSocket>& TargetSockets, const FTransform& HeldPartTransform,
 	const FPolySnapCandidate& Anchor, const FTransform& HeldAnchorSocketLocal, const FPolySnapSocketBasis& AnchorBasis,
-	const FPolySnapQueryTolerances& Tolerances, EPolySnapPolarity& OutPolarity, double& OutDihedralDegrees)
+	const FPolySnapQueryTolerances& Tolerances, EPolySnapPolarity& OutPolarity, double& OutDihedralDegrees,
+	double& OutRequiredRotationDegrees)
 {
-	double BestResidualUu = Tolerances.AdoptionDistanceUu;
+	double BestRotationDegrees = TNumericLimits<double>::Max();
+	double BestResidualUu = TNumericLimits<double>::Max();
 	bool bFound = false;
 
 	for (const FPolySnapWorldSocket& HeldSocket : HeldSockets)
@@ -90,16 +103,26 @@ constexpr EPolySnapPolarity Polarities[] = {EPolySnapPolarity::Aligned, EPolySna
 				double ResidualUu = 0.0;
 
 				if (!FPolySnapGeometry::AdoptDihedralDegrees(HeldAnchorSocketLocal, HeldSecondaryLocal, AnchorBasis,
-						Polarity, TargetSocket.WorldTransform.GetLocation(), DihedralDegrees, ResidualUu))
+						Polarity, TargetSocket.WorldTransform.GetLocation(), DihedralDegrees, ResidualUu)
+					|| ResidualUu > Tolerances.AdoptionDistanceUu)
 				{
 					continue;
 				}
 
-				if (ResidualUu < BestResidualUu)
+				const double RotationDegrees = RotationToPlacementDegrees(HeldAnchorSocketLocal, HeldPartTransform,
+					AnchorBasis, Polarity, DihedralDegrees);
+
+				const bool bNearer = RotationDegrees < BestRotationDegrees - RotationTieDegrees;
+				const bool bTiedButCloser =
+					RotationDegrees < BestRotationDegrees + RotationTieDegrees && ResidualUu < BestResidualUu;
+
+				if (bNearer || bTiedButCloser)
 				{
+					BestRotationDegrees = RotationDegrees;
 					BestResidualUu = ResidualUu;
 					OutPolarity = Polarity;
 					OutDihedralDegrees = DihedralDegrees;
+					OutRequiredRotationDegrees = RotationDegrees;
 					bFound = true;
 				}
 			}
@@ -214,13 +237,9 @@ FPolySnapCandidate FPolySnapSnapQuery::FindBest(const TArray<FPolySnapWorldSocke
 			// DESIGN section 2.5 solves theta in this order, and the order is the whole point: with
 			// a second pair in tolerance the fold is decided by the geometry already built, and
 			// only without one does it fall to how the player happens to be holding the part.
-			if (PolySnapSnapQueryPrivate::SolveAdoptDrivenPlacement(HeldSockets, TargetSockets, HeldPartTransform,
-					Candidate, HeldSocketLocal, TargetBasis, Tolerances, Candidate.Polarity, Candidate.DihedralDegrees))
-			{
-				Candidate.RequiredRotationDegrees = PolySnapSnapQueryPrivate::RotationToPlacementDegrees(
-					HeldSocketLocal, HeldPartTransform, TargetBasis, Candidate.Polarity, Candidate.DihedralDegrees);
-			}
-			else
+			if (!PolySnapSnapQueryPrivate::SolveAdoptDrivenPlacement(HeldSockets, TargetSockets, HeldPartTransform,
+					Candidate, HeldSocketLocal, TargetBasis, Tolerances, Candidate.Polarity, Candidate.DihedralDegrees,
+					Candidate.RequiredRotationDegrees))
 			{
 				FPolySnapGeometry::SolveNearestPlacement(HeldSocketLocal, HeldPartTransform, TargetBasis,
 					Candidate.Polarity, Candidate.DihedralDegrees, Candidate.RequiredRotationDegrees);
