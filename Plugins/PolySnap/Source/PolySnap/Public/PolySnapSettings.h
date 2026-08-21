@@ -110,6 +110,22 @@ public:
 		meta = (ClampMin = "0.0", ClampMax = "90.0", ForceUnits = "deg"))
 	float MinDihedralDegrees = 5.0f;
 
+	/**
+	 * How far a placement may turn the part from the pose it is being held in before its closure
+	 * is declined (DESIGN section 2.5).
+	 *
+	 * Measured as the angle the anchor socket's Normal sweeps. The anchor pins the edge, so the
+	 * part can only hinge about it and the Normal turns with the hinge: this is the fold
+	 * correction and nothing else. Turning the part over reverses the Normal, so a polarity the
+	 * player is not already holding reads as roughly 180 and is refused.
+	 *
+	 * It is the adoption that is declined, never the anchor. The part still snaps where it was
+	 * aimed; the seam that did not close stays visible, and the player nudges and snaps it by hand.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Snapping",
+		meta = (ClampMin = "0.0", ClampMax = "180.0", ForceUnits = "deg"))
+	float AdoptTurnToleranceDegrees = 20.0f;
+
 	/** How far in front of the camera a held part is carried, before the player pushes or pulls it. */
 	UPROPERTY(config, EditAnywhere, Category = "Building", meta = (ClampMin = "10.0", ForceUnits = "cm"))
 	float DefaultHoldDistanceUu = 250.0f;

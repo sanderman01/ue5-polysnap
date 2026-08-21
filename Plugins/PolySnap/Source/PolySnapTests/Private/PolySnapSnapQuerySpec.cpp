@@ -51,6 +51,21 @@ static FTransform SecondarySocketAt(const FTransform& PartTransform)
 	return FTransform(FRotator(0.0, 180.0, 0.0), FVector(-HalfPanelUu, 0.0, 0.0)) * PartTransform;
 }
 
+/**
+ * A panel hinged Degrees away from lying flat, about the edge a panel at the origin owns.
+ *
+ * Zero leaves it coplanar and beside that panel; ninety stands it upright on the shared edge.
+ * Written as a hinge rather than as a transform literal because that is the motion every one of
+ * these tests is about, and a bare rotator plus location hides which fold it means.
+ */
+static FTransform PanelHingedAt(double Degrees)
+{
+	const FRotator Fold(Degrees, 0.0, 0.0);
+	const FVector AnchorEdge(HalfPanelUu, 0.0, 0.0);
+
+	return FTransform(Fold, AnchorEdge + Fold.RotateVector(FVector(HalfPanelUu, 0.0, 0.0)));
+}
+
 static FString RejectionName(EPolySnapRejection Rejection)
 {
 	return FPolySnapSnapQuery::RejectionToString(Rejection);
@@ -370,7 +385,10 @@ void FPolySnapSnapQuerySpec::Define()
 					// already placed lands every one of its sockets on that panel's, at a residual of
 					// exactly zero -- so ranking closures by residual makes the degenerate answer beat
 					// the intended one every time, and the assembly stacks instead of closing.
-					const FTransform PanelB(FRotator::ZeroRotator, FVector(2.0 * HalfPanelUu + 2.0, 0.0, 0.0));
+					//
+					// B is held most of the way to standing, because a closure has to be one the
+					// player has nearly made before it is offered at all.
+					const FTransform PanelB = PanelHingedAt(75.0);
 
 					// The intended closure: a socket standing over the anchor, missing by a hair.
 					const FTransform StandingTarget(FRotator(0.0, 180.0, 0.0),
@@ -399,12 +417,13 @@ void FPolySnapSnapQuerySpec::Define()
 				[this, Tolerances, PanelA]()
 				{
 					// DESIGN section 2.5's adopt-driven reading, and the one that makes a shell close.
-					// B is held flat, but the only way its far socket reaches the second target is to
-					// fold a quarter turn: the geometry already built decides the angle, not the wrist.
-					const FTransform PanelB(FRotator::ZeroRotator, FVector(2.0 * HalfPanelUu + 2.0, 0.0, 0.0));
+					// B is held fifteen degrees short of where its far socket meets the second
+					// target: the wrist gets the fold close and the geometry already built supplies
+					// the rest, which is the whole of what adoption is for.
+					const FTransform PanelB = PanelHingedAt(75.0);
 
-					// A socket standing directly over the anchor, one panel width up. Nothing but a
-					// fold puts B's far edge there.
+					// A socket standing directly over the anchor, one panel width up. Only finishing
+					// the fold puts B's far edge there.
 					const FTransform StandingTarget(FRotator(0.0, 180.0, 0.0),
 						FVector(HalfPanelUu, 0.0, 2.0 * HalfPanelUu));
 
@@ -419,7 +438,8 @@ void FPolySnapSnapQuerySpec::Define()
 					TestTrue("found an anchor", Candidate.IsSet());
 					TestEqual("one adoption", Candidate.Adoptions.Num(), 1);
 
-					// Held flat, the least-rotation reading would have left it flat and closed nothing.
+					// Held short of true, the least-rotation reading would have left it short and
+					// closed nothing. The seam decides the last fifteen degrees.
 					TestEqual("folded to stand on the anchor", Candidate.SolvedPartTransform.GetLocation(),
 						FVector(HalfPanelUu, 0.0, HalfPanelUu), 1.0e-3f);
 				});
@@ -484,6 +504,61 @@ void FPolySnapSnapQuerySpec::Define()
 					// a builder cannot tell from a bug.
 					TestTrue(*FString::Printf(TEXT("said why: %s"), *RejectionName(EPolySnapRejection::Coincident)),
 						bSaidWhy);
+				});
+		});
+
+	Describe("declining a closure the part is nowhere near",
+		[this, Tolerances]()
+		{
+			const FTransform PanelA = FTransform::Identity;
+
+			// A socket standing over the anchor, a quarter turn from where a flat-held panel is.
+			const FTransform StandingTarget(FRotator(0.0, 180.0, 0.0), FVector(HalfPanelUu, 0.0, 2.0 * HalfPanelUu));
+
+			It("leaves the seam open rather than folding the part somewhere it was not turned",
+				[this, Tolerances, PanelA, StandingTarget]()
+				{
+					// As a part hinges, each of its sockets sweeps a circle past whatever else is
+					// built, and any panel that circle passes offers a closure. Held flat, B is a
+					// quarter turn from this one -- a fold nobody made and nobody asked for.
+					const FTransform PanelB = PanelHingedAt(0.0);
+
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelA)),
+						MakeSocket(2, TEXT("2000"), StandingTarget)};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(5, TEXT("2000"), SecondarySocketAt(PanelB)),
+						MakeSocket(6, TEXT("2000"), PrimarySocketAt(PanelB))};
+
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
+
+					// The anchor is never what a declined closure costs. The part lands on the edge
+					// the player aimed at, at the angle they were holding it, and the seam that did
+					// not close is there to be seen and nudged.
+					TestTrue("still anchored", Candidate.IsSet());
+					TestEqual("nothing adopted", Candidate.Adoptions.Num(), 0);
+					TestEqual("left at the fold it was held at", Candidate.SolvedPartTransform.GetLocation(),
+						PanelHingedAt(0.0).GetLocation(), 1.0e-3f);
+				});
+
+			It("closes the same seam once the part is turned most of the way to it",
+				[this, Tolerances, PanelA, StandingTarget]()
+				{
+					// The same panel and the same seam as above. Nothing about the geometry changed;
+					// the player turned the part, and that is what makes the closure theirs.
+					const FTransform PanelB = PanelHingedAt(75.0);
+
+					const TArray<FPolySnapWorldSocket> Targets = {MakeSocket(1, TEXT("2000"), PrimarySocketAt(PanelA)),
+						MakeSocket(2, TEXT("2000"), StandingTarget)};
+					const TArray<FPolySnapWorldSocket> Held = {MakeSocket(5, TEXT("2000"), SecondarySocketAt(PanelB)),
+						MakeSocket(6, TEXT("2000"), PrimarySocketAt(PanelB))};
+
+					const FPolySnapCandidate Candidate =
+						FPolySnapSnapQuery::FindBest(Held, Targets, PanelB, Tolerances);
+
+					TestTrue("found an anchor", Candidate.IsSet());
+					TestEqual("one adoption", Candidate.Adoptions.Num(), 1);
+					TestEqual("folded the rest of the way", Candidate.SolvedPartTransform.GetLocation(),
+						PanelHingedAt(90.0).GetLocation(), 1.0e-3f);
 				});
 		});
 }

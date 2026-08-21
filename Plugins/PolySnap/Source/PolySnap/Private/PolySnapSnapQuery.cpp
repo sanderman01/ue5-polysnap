@@ -71,6 +71,23 @@ constexpr EPolySnapPolarity Polarities[] = {EPolySnapPolarity::Aligned, EPolySna
 	return FPolySnapGeometry::AngleBetweenDegrees(SolvedRotation, CurrentSocketRotation);
 }
 
+/**
+ * How far a placement turns the part from the pose it is being held in, in degrees.
+ *
+ * The angle the anchor socket's Normal sweeps to reach the placement. With the anchor pinning the
+ * edge the part can only hinge about it, and the Normal turns with the hinge, so this measures the
+ * fold correction and little else. Signed rather than absolute on purpose: a polarity flip turns
+ * the part over and reverses the Normal, and that has to read as a half turn rather than as no
+ * movement at all.
+ */
+[[nodiscard]] double TurnToPlacementDegrees(const FVector& CurrentNormal, const FPolySnapSocketBasis& Anchor,
+	EPolySnapPolarity Polarity, double DihedralDegrees)
+{
+	const FVector PlacedNormal = FPolySnapGeometry::MatedBasis(Anchor, Polarity, DihedralDegrees).Normal;
+
+	return FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(CurrentNormal | PlacedNormal, -1.0, 1.0)));
+}
+
 /** Below this, two placements are equally far from where the part is held and the residual decides. */
 constexpr double RotationTieDegrees = 1.0e-3;
 
@@ -98,6 +115,9 @@ constexpr double RotationTieDegrees = 1.0e-3;
 	double BestRotationDegrees = TNumericLimits<double>::Max();
 	double BestResidualUu = TNumericLimits<double>::Max();
 	bool bFound = false;
+
+	// Where the part is actually being held, which is what every closure is measured against.
+	const FVector HeldNormal = FPolySnapGeometry::BasisFromTransform(Anchor.HeldSocket.WorldTransform).Normal;
 
 	for (const FPolySnapWorldSocket& HeldSocket : HeldSockets)
 	{
@@ -130,6 +150,18 @@ constexpr double RotationTieDegrees = 1.0e-3;
 				// edge, where the intended coplanar answer closes no second pair and so was never a
 				// candidate here to begin with.
 				if (IsCoincidentFold(DihedralDegrees, Tolerances.MinDihedralDegrees))
+				{
+					continue;
+				}
+
+				// The closure has to be one the player has all but made already. A socket sweeping
+				// its circle passes near whatever else is built, and without this any of those
+				// passes is a fold the part will take -- 60 degrees round the hinge onto a panel
+				// nobody was aiming at, as readily as 2 degrees onto the one they were. Declining
+				// leaves the seam open rather than the anchor refused, so the part still lands where
+				// it was aimed and the player can nudge that edge and snap it themselves.
+				if (TurnToPlacementDegrees(HeldNormal, AnchorBasis, Polarity, DihedralDegrees)
+					> Tolerances.AdoptTurnToleranceDegrees)
 				{
 					continue;
 				}
@@ -259,9 +291,9 @@ FPolySnapCandidate FPolySnapSnapQuery::FindBest(const TArray<FPolySnapWorldSocke
 
 			const FPolySnapSocketBasis TargetBasis = FPolySnapGeometry::BasisFromTransform(TargetSocket.WorldTransform);
 
-			// DESIGN section 2.5 solves theta in this order, and the order is the whole point: with
-			// a second pair in tolerance the fold is decided by the geometry already built, and
-			// only without one does it fall to how the player happens to be holding the part.
+			// DESIGN section 2.5 solves theta in this order, and the order is the whole point: a
+			// second pair the part is nearly folded to already has the built geometry finish the
+			// fold exactly, and only without one does it fall to the wrist alone.
 			if (!PolySnapSnapQueryPrivate::SolveAdoptDrivenPlacement(HeldSockets, TargetSockets, HeldPartTransform,
 					Candidate, HeldSocketLocal, TargetBasis, Tolerances, Candidate.Polarity, Candidate.DihedralDegrees,
 					Candidate.RequiredRotationDegrees))

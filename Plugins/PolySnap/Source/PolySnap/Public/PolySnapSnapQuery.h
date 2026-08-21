@@ -44,6 +44,22 @@ struct POLYSNAP_API FPolySnapQueryTolerances
 	 * refused without a collision query the snapper has no business making.
 	 */
 	double MinDihedralDegrees = 5.0;
+
+	/**
+	 * How far a placement may turn the part from the pose it is being held in before its closure
+	 * is declined, in degrees (DESIGN section 2.5).
+	 *
+	 * Measured as the angle the anchor socket's Normal sweeps. Once the anchor pins the edge the
+	 * part can only hinge about it, and the Normal turns with the hinge, so this is the fold
+	 * correction and nothing else. A polarity flip turns the part over and reverses the Normal, so
+	 * it reads as roughly 180 and is refused unless the part is already held that way round.
+	 *
+	 * Without it a closure is admissible however far away it is, and one lying 60 degrees round the
+	 * hinge -- a nearby panel the sweeping socket happens to pass -- wins a fold nobody asked for.
+	 * The adoption is the thing declined, never the anchor: the part still snaps where the player
+	 * aimed it, with a seam they can see and nudge and then snap by hand.
+	 */
+	double AdoptTurnToleranceDegrees = 20.0;
 };
 
 /** One rejected pair, kept so the debug readout can say why a snap did not happen. */
@@ -82,9 +98,10 @@ public:
 	 *
 	 * The anchor is the pair the player is driving, and its dihedral is solved in the order
 	 * DESIGN section 2.5 gives: adopt-driven first -- the theta that closes some second socket
-	 * pair, so the geometry already built decides the fold -- and the player-driven nearest
-	 * placement only when no second pair comes within AdoptionDistanceUu. Where several pass, they
-	 * are scored
+	 * pair, so the geometry already built finishes a fold the player has nearly made -- and the
+	 * player-driven nearest placement whenever no second pair is both within AdoptionDistanceUu
+	 * and within AdoptTurnToleranceDegrees of the pose the part is held in. Where several pass,
+	 * they are scored
 	 *
 	 *     cost = Gap / SnapDistance + RequiredRotation / TangentAngleTolerance
 	 *

@@ -154,8 +154,12 @@ public:
 	/**
 	 * The dihedral that brings one secondary socket pair as close together as rotation about the
 	 * shared edge can. DESIGN section 2.5's adopt-driven reading, and the one that takes
-	 * precedence: where a second pair is in tolerance, the placement is decided by the geometry
-	 * already built rather than by how the player happened to be holding the part.
+	 * precedence: where a second pair is in tolerance, the geometry already built decides the fold
+	 * exactly, rather than the wrist that got it close.
+	 *
+	 * How close is the caller's business, not this function's. It answers for any secondary pair
+	 * put to it, including one the part would have to be turned right round to reach; refusing
+	 * those is FPolySnapSnapQuery's AdoptTurnToleranceDegrees.
 	 *
 	 * Closed form, not a search. Solving the anchor at theta = 0 and then hinging is a rigid
 	 * rotation of the whole part about the world line through the anchor, so the secondary socket

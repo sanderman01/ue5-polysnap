@@ -347,9 +347,10 @@ The anchor pins five of six degrees of freedom, leaving θ. θ and polarity are 
    target's offset from the anchor into components along and across the axis, then rotate the held
    socket's across-axis component onto the target's. One `atan2`, no iteration. The along-axis
    component does not rotate — **that leftover is the residual.** Search both polarities and every
-   secondary pair; every θ whose residual is inside the adoption tolerance is admissible, and
-   **the one requiring least rotation from the part's current pose wins**, the residual breaking
-   ties rather than deciding.
+   secondary pair; a θ is admissible when its residual is inside the adoption tolerance **and it
+   turns the part no further than the turn tolerance from the pose it is held in**, and among
+   those **the one requiring least rotation from the part's current pose wins**, the residual
+   breaking ties rather than deciding.
 2. **Player-driven.** With no secondary candidate in tolerance, both come from the nearest point
    on the constraint manifold to the part's current orientation (§2.3).
 
@@ -375,6 +376,25 @@ sensible one found later in the sweep — and with nothing else on offer the sea
 and the player-driven reading answers. Should that reading also be coincident, the pair is
 **rejected**, with a reason the readout names: a player holding one panel over another is not
 aiming at a seam, and a seam that refuses to close is a better answer than two panels in one place.
+
+#### The turn tolerance
+
+**20°, measured as the angle the anchor socket's Normal sweeps.** Ranking closures by rotation
+says which of them the builder was aiming at; it does not ask whether they were aiming at any of
+them. As a part hinges, each of its sockets sweeps a circle past everything already built, and
+every panel that circle passes offers a closure — one 60° round the hinge as readily as one 2°
+away. Unranked against the player's own pose, the far one is taken whenever it is the only one,
+and the part folds somewhere nobody turned it.
+
+So a closure must be one the builder has all but made already. The anchor pins the edge, leaving
+the part only the hinge, and the Normal turns with the hinge — which makes this the fold
+correction and nothing else, uncontaminated by how far the part had to move to reach the edge. It
+also settles polarity without a second rule: turning a part over reverses its Normal, so a flip
+reads as a half turn and is refused unless the part is already held that way round.
+
+**It is the adoption that is declined, never the anchor.** The part still lands on the edge the
+player aimed at, at the angle they were holding it. The seam that did not close is visible, and
+closing it is a nudge and a second snap — which is the builder deciding, and is the point.
 
 **Adoption takes unconnected target sockets only.** A joint may host more than two panels (§2.4),
 but joining a new part into an *occupied* joint needs the first-class joint of Milestone 3 — until
@@ -623,7 +643,10 @@ Marked explicitly so nobody builds on them as though they were settled.
   exercises neither edge of the range, so what counts as *too* loose is still unknown.
   `MinDihedralDegrees` (§2.5) is a fourth and the least exercised of them: at 5° it sits nowhere
   near any angle a shell has asked for, so nothing built so far says where it belongs. A part that
-  wants a genuinely sharp fold — a wedge, a spine — would be the first thing to press on it.
+  wants a genuinely sharp fold — a wedge, a spine — would be the first thing to press on it. The
+  **turn tolerance** (§2.5) is a fifth, and the one a player will feel: too tight and a shell has
+  to be hand-folded seam by seam, too loose and panels fold onto geometry nobody aimed at. 20° is
+  a first guess, and only building by hand rather than from a fixture will say whether it is one.
 - **Coincident placements.** Settled for a part that shares an edge with the one it would land
   on: §2.5 refuses a fold within `MinDihedralDegrees` of fully closed, on both paths, and decides
   it from the two socket bases rather than from a collision query. What stays open is the case

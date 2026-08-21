@@ -102,6 +102,7 @@ FPolySnapQueryTolerances UPolySnapSubsystem::GetQueryTolerances()
 	Tolerances.AdoptionDistanceUu = Settings.AdoptionDistanceUu;
 	Tolerances.AdoptionAngleToleranceDegrees = Settings.AdoptionAngleToleranceDegrees;
 	Tolerances.MinDihedralDegrees = Settings.MinDihedralDegrees;
+	Tolerances.AdoptTurnToleranceDegrees = Settings.AdoptTurnToleranceDegrees;
 
 	return Tolerances;
 }
