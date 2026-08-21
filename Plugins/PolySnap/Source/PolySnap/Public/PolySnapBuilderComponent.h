@@ -11,19 +11,19 @@
 class APawn;
 class UInputAction;
 class UInputMappingContext;
-class UPolySnapPieceComponent;
+class UPolySnapConnectorComponent;
 struct FInputActionValue;
 
 /**
- * Lets a pawn pick up a PolySnap piece, carry it, see where it would snap, and place it.
+ * Lets a pawn pick up a PolySnap part, carry it, see where it would snap, and place it.
  *
  * Add it to any player pawn -- it needs nothing from the pawn's class, and it builds its own
  * input mapping context at runtime rather than requiring Input Action assets to be authored. That
  * is what keeps PolySnap free of dependencies on any particular project's input setup.
  *
- * While a piece is held it is kinematic and locked to the view, because its transform is the
+ * While a part is held it is kinematic and locked to the view, because its transform is the
  * answer the snap solver produced and a simulating body would drift straight off it. On placement
- * the piece is teleported to the solved transform, the connection and its residual are logged,
+ * the part is teleported to the solved transform, the connection and its residual are logged,
  * and only then does it start simulating again -- joined to its neighbour by a constraint that is
  * free about the shared edge and locked everywhere else.
  */
@@ -42,21 +42,21 @@ public:
 		FActorComponentTickFunction* ThisTickFunction) override;
 	//~ End UActorComponent interface
 
-	/** The piece being carried, if any. */
+	/** The part being carried, if any. */
 	UFUNCTION(BlueprintPure, Category = "PolySnap")
-	UPolySnapPieceComponent* GetHeldPiece() const { return HeldPiece; }
+	UPolySnapConnectorComponent* GetHeldPart() const { return HeldPart; }
 
-	/** Picks up the piece under the crosshair. Does nothing if something is already held. */
+	/** Picks up the part under the crosshair. Does nothing if something is already held. */
 	UFUNCTION(BlueprintCallable, Category = "PolySnap")
-	bool GrabPieceUnderCrosshair();
+	bool GrabPartUnderCrosshair();
 
-	/** Places the held piece, snapping it if a candidate is in tolerance. */
+	/** Places the held part, snapping it if a candidate is in tolerance. */
 	UFUNCTION(BlueprintCallable, Category = "PolySnap")
-	void PlaceHeldPiece();
+	void PlaceHeldPart();
 
-	/** Lets go of the held piece where it is, never snapping. */
+	/** Lets go of the held part where it is, never snapping. */
 	UFUNCTION(BlueprintCallable, Category = "PolySnap")
-	void DropHeldPiece();
+	void DropHeldPart();
 
 	/** Priority of the runtime mapping context. Above the project's own, so building keys win. */
 	UPROPERTY(EditDefaultsOnly, Category = "PolySnap")
@@ -80,28 +80,28 @@ private:
 	/** Where the player is looking from. False when there is no local player controller yet. */
 	bool GetViewPoint(FVector& OutLocation, FRotator& OutRotation) const;
 
-	/** Moves the held piece to where the view says it should be, before the query runs. */
-	void UpdateHeldPieceTransform();
+	/** Moves the held part to where the view says it should be, before the query runs. */
+	void UpdateHeldPartTransform();
 
-	/** Runs the section 2.5 candidate search for the held piece. */
+	/** Runs the section 2.5 candidate search for the held part. */
 	void UpdateCandidate();
 
-	/** Records the connection on both pieces and creates the hinge constraint. */
+	/** Records the connection on both parts and creates the hinge constraint. */
 	void CommitConnection(const FPolySnapCandidate& Candidate, double ResidualUu);
 
 	void DrawDebug() const;
 
-	/** The piece being carried. Kinematic while held. */
+	/** The part being carried. Kinematic while held. */
 	UPROPERTY(Transient)
-	TObjectPtr<UPolySnapPieceComponent> HeldPiece;
+	TObjectPtr<UPolySnapConnectorComponent> HeldPart;
 
-	/** The piece's rotation relative to the view when it was grabbed, so pick-up does not jerk it. */
+	/** The part's rotation relative to the view when it was grabbed, so pick-up does not jerk it. */
 	FQuat HeldRelativeRotation = FQuat::Identity;
 
 	/** Player-applied roll about the view forward axis, the one orientation freedom looking cannot give. */
 	double HeldRollDegrees = 0.0;
 
-	/** How far in front of the view the piece is carried. */
+	/** How far in front of the view the part is carried. */
 	double HoldDistanceUu = 250.0;
 
 	/** The best candidate as of the last tick, or unset. What the preview and readout describe. */

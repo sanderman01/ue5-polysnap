@@ -14,18 +14,18 @@
 #include "PhysicsEngine/BodyInstance.h"
 #include "PhysicsProxy/SingleParticlePhysicsProxy.h"
 #include "PolySnap.h"
+#include "PolySnapConnectorComponent.h"
 #include "PolySnapGeometry.h"
-#include "PolySnapPieceComponent.h"
 #include "PolySnapSettings.h"
 #include "PolySnapSubsystem.h"
 
 namespace PolySnapDebugPrivate
 {
 static TAutoConsoleVariable<int32> CVarDrawMode(TEXT("PolySnap.Debug.Draw"), 1,
-	TEXT("PolySnap socket visualisation. 0 off, 1 held piece and candidates, 2 every registered piece."), ECVF_Cheat);
+	TEXT("PolySnap socket visualisation. 0 off, 1 held part and candidates, 2 every registered part."), ECVF_Cheat);
 
 static TAutoConsoleVariable<int32> CVarText(TEXT("PolySnap.Debug.Text"), 1,
-	TEXT("PolySnap on-screen readout: held piece, candidate, gap, angle, polarity, dihedral."), ECVF_Cheat);
+	TEXT("PolySnap on-screen readout: held part, candidate, gap, angle, polarity, dihedral."), ECVF_Cheat);
 
 static TAutoConsoleVariable<float> CVarMaxDistance(TEXT("PolySnap.Debug.MaxDistance"), 3000.0f,
 	TEXT("Beyond this distance from the viewer, PolySnap draws nothing. Unreal units."), ECVF_Cheat);
@@ -87,11 +87,11 @@ const FColor JointColour = FColor(220, 60, 220);
 }
 
 /**
- * Reports what each piece's body actually has, as opposed to what the settings asked for.
+ * Reports what each part's body actually has, as opposed to what the settings asked for.
  *
- * The two are not the same thing, and the gap between them is where a piece that will not settle
+ * The two are not the same thing, and the gap between them is where a part that will not settle
  * hides: a value can be written to a body instance and never reach the particle the solver reads.
- * This prints both sides, plus the state and speed that say whether the piece is still being
+ * This prints both sides, plus the state and speed that say whether the part is still being
  * driven by something.
  */
 void DumpPhysicsOnce(UWorld* World);
@@ -99,8 +99,8 @@ void DumpPhysicsOnce(UWorld* World);
 /**
  * PolySnap.DumpPhysics [seconds] -- one dump, or one every half second for that long.
  *
- * The timed form is the one that answers "does a nudged piece settle": a single sample cannot
- * tell a piece that is slowing down from one that is not.
+ * The timed form is the one that answers "does a nudged part settle": a single sample cannot
+ * tell a part that is slowing down from one that is not.
  */
 void DumpPhysics(const TArray<FString>& Args, UWorld* World)
 {
@@ -113,7 +113,7 @@ void DumpPhysics(const TArray<FString>& Args, UWorld* World)
 	}
 
 	// A ticker rather than a world timer, so the sampling interval is wall clock and a dump still
-	// lands if the world is paused -- a paused piece that looks stopped is exactly the confusion
+	// lands if the world is paused -- a paused part that looks stopped is exactly the confusion
 	// this is meant to resolve.
 	constexpr float SampleInterval = 0.5f;
 	FTSTicker::GetCoreTicker().AddTicker(
@@ -145,23 +145,23 @@ void DumpPhysicsOnce(UWorld* World)
 	const UPolySnapSettings& Settings = UPolySnapSettings::Get();
 	UE_LOG(LogPolySnap, Display,
 		TEXT("PolySnap physics dump. Settings ask for damping %.2f linear, %.2f angular; sleep %s x%.2f."),
-			Settings.PieceLinearDamping, Settings.PieceAngularDamping,
-			Settings.bUsePieceSleepThreshold ? TEXT("custom") : TEXT("normal"), Settings.PieceSleepThresholdMultiplier);
+			Settings.PartLinearDamping, Settings.PartAngularDamping,
+			Settings.bUsePartSleepThreshold ? TEXT("custom") : TEXT("normal"), Settings.PartSleepThresholdMultiplier);
 
-	int32 PieceCount = 0;
+	int32 PartCount = 0;
 
-	for (const TWeakObjectPtr<UPolySnapPieceComponent>& WeakPiece : Subsystem->GetRegisteredPieces())
+	for (const TWeakObjectPtr<UPolySnapConnectorComponent>& WeakPart : Subsystem->GetRegisteredParts())
 	{
-		const UPolySnapPieceComponent* Piece = WeakPiece.Get();
-		if (Piece == nullptr)
+		const UPolySnapConnectorComponent* Part = WeakPart.Get();
+		if (Part == nullptr)
 		{
 			continue;
 		}
 
-		++PieceCount;
+		++PartCount;
 
-		const AActor* Owner = Piece->GetOwner();
-		UMeshComponent* Mesh = Piece->GetResolvedSocketMesh();
+		const AActor* Owner = Part->GetOwner();
+		UMeshComponent* Mesh = Part->GetResolvedSocketMesh();
 		if (Mesh == nullptr)
 		{
 			UE_LOG(LogPolySnap, Warning, TEXT("  %s: no resolved socket mesh."), *GetNameSafe(Owner));
@@ -186,12 +186,12 @@ void DumpPhysicsOnce(UWorld* World)
 			TEXT("  %-38s %-11s v %7.2f cm/s  w %7.2f deg/s  drag %5.2f/%5.2f (asked %5.2f/%5.2f)  ")
 				TEXT("sleep x%.2f  connections %d  class %s"), *GetNameSafe(Owner),
 					DescribeObjectState(Particle.ObjectState()), LinearSpeed, AngularSpeed, Particle.LinearEtherDrag(),
-					Particle.AngularEtherDrag(), Settings.PieceLinearDamping, Settings.PieceAngularDamping,
-					Body->GetSleepThresholdMultiplier(), Piece->GetConnections().Num(),
+					Particle.AngularEtherDrag(), Settings.PartLinearDamping, Settings.PartAngularDamping,
+					Body->GetSleepThresholdMultiplier(), Part->GetConnections().Num(),
 					*GetNameSafe(Owner != nullptr ? Owner->GetClass() : nullptr));
 	}
 
-	UE_LOG(LogPolySnap, Display, TEXT("PolySnap physics dump: %d piece(s)."), PieceCount);
+	UE_LOG(LogPolySnap, Display, TEXT("PolySnap physics dump: %d part(s)."), PartCount);
 }
 
 /** PolySnap.SetDamping <linear> <angular> [sleepMultiplier] -- retune from inside PIE. */
@@ -206,31 +206,30 @@ void SetDamping(const TArray<FString>& Args)
 	UPolySnapSettings* Settings = GetMutableDefault<UPolySnapSettings>();
 	check(Settings != nullptr);
 
-	Settings->PieceLinearDamping = FCString::Atof(*Args[0]);
-	Settings->PieceAngularDamping = FCString::Atof(*Args[1]);
+	Settings->PartLinearDamping = FCString::Atof(*Args[0]);
+	Settings->PartAngularDamping = FCString::Atof(*Args[1]);
 
 	if (Args.Num() >= 3)
 	{
-		Settings->PieceSleepThresholdMultiplier = FCString::Atof(*Args[2]);
-		Settings->bUsePieceSleepThreshold = Settings->PieceSleepThresholdMultiplier > 0.0f;
+		Settings->PartSleepThresholdMultiplier = FCString::Atof(*Args[2]);
+		Settings->bUsePartSleepThreshold = Settings->PartSleepThresholdMultiplier > 0.0f;
 	}
 
-	// The same broadcast the settings panel makes, so every live piece re-applies. Nothing is
+	// The same broadcast the settings panel makes, so every live part re-applies. Nothing is
 	// written to the ini: a value found this way is meant to be typed into Project Settings once
 	// it is the one you want to keep.
 	UPolySnapSettings::OnSettingsChanged().Broadcast();
 
 	UE_LOG(LogPolySnap, Display,
-		TEXT("PolySnap damping now %.2f linear, %.2f angular; sleep %s x%.2f."), Settings->PieceLinearDamping,
-			Settings->PieceAngularDamping,
-			Settings->bUsePieceSleepThreshold ? TEXT("custom")
-											  : TEXT("normal"), Settings->PieceSleepThresholdMultiplier);
+		TEXT("PolySnap damping now %.2f linear, %.2f angular; sleep %s x%.2f."), Settings->PartLinearDamping,
+			Settings->PartAngularDamping,
+			Settings->bUsePartSleepThreshold ? TEXT("custom") : TEXT("normal"), Settings->PartSleepThresholdMultiplier);
 }
 
 /**
- * PolySnap.Nudge [speed] -- hands every piece to the simulation and shoves it.
+ * PolySnap.Nudge [speed] -- hands every part to the simulation and shoves it.
  *
- * The behaviour this project cares about most is what a piece does after the player lets go, and
+ * The behaviour this project cares about most is what a part does after the player lets go, and
  * that is otherwise only reachable by playing. This reproduces it in one command, so a settling
  * time can be measured in a headless session instead of estimated by eye.
  */
@@ -246,23 +245,23 @@ void Nudge(const TArray<FString>& Args, UWorld* World)
 	const double Speed = Args.Num() > 0 ? FCString::Atod(*Args[0]) : 200.0;
 	int32 NudgedCount = 0;
 
-	for (const TWeakObjectPtr<UPolySnapPieceComponent>& WeakPiece : Subsystem->GetRegisteredPieces())
+	for (const TWeakObjectPtr<UPolySnapConnectorComponent>& WeakPart : Subsystem->GetRegisteredParts())
 	{
-		UPolySnapPieceComponent* Piece = WeakPiece.Get();
-		if (Piece == nullptr)
+		UPolySnapConnectorComponent* Part = WeakPart.Get();
+		if (Part == nullptr)
 		{
 			continue;
 		}
 
-		Piece->SetSimulating(true);
+		Part->SetSimulating(true);
 
-		UMeshComponent* Mesh = Piece->GetResolvedSocketMesh();
+		UMeshComponent* Mesh = Part->GetResolvedSocketMesh();
 		if (Mesh == nullptr || !Mesh->IsSimulatingPhysics())
 		{
 			continue;
 		}
 
-		// Deterministic rather than random: two runs of the same test should shove the same piece
+		// Deterministic rather than random: two runs of the same test should shove the same part
 		// the same way, or a settling time cannot be compared against the last one.
 		const double Phase = NudgedCount * 1.7;
 		Mesh->SetPhysicsLinearVelocity(FVector(FMath::Cos(Phase), FMath::Sin(Phase), 0.35) * Speed);
@@ -270,20 +269,20 @@ void Nudge(const TArray<FString>& Args, UWorld* World)
 		++NudgedCount;
 	}
 
-	UE_LOG(LogPolySnap, Display, TEXT("PolySnap.Nudge: shoved %d piece(s) at %.0f cm/s."), NudgedCount, Speed);
+	UE_LOG(LogPolySnap, Display, TEXT("PolySnap.Nudge: shoved %d part(s) at %.0f cm/s."), NudgedCount, Speed);
 }
 
 static FAutoConsoleCommandWithWorldAndArgs CmdDumpPhysics(TEXT("PolySnap.DumpPhysics"),
-	TEXT("PolySnap.DumpPhysics [seconds]. Logs what each piece's body actually has: state, speed, ")
-		TEXT("damping, sleep multiplier. With a duration, samples every half second so a piece can be ")
+	TEXT("PolySnap.DumpPhysics [seconds]. Logs what each part's body actually has: state, speed, ")
+		TEXT("damping, sleep multiplier. With a duration, samples every half second so a part can be ")
 			TEXT("watched settling."), FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&DumpPhysics));
 
 static FAutoConsoleCommandWithWorldAndArgs CmdNudge(TEXT("PolySnap.Nudge"),
-	TEXT("PolySnap.Nudge [speed]. Hands every piece to the simulation and shoves it, to watch it settle."),
+	TEXT("PolySnap.Nudge [speed]. Hands every part to the simulation and shoves it, to watch it settle."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&Nudge));
 
 static FAutoConsoleCommand CmdSetDamping(TEXT("PolySnap.SetDamping"),
-	TEXT("PolySnap.SetDamping <linear> <angular> [sleepMultiplier]. Applies to every live piece at once."),
+	TEXT("PolySnap.SetDamping <linear> <angular> [sleepMultiplier]. Applies to every live part at once."),
 		FConsoleCommandWithArgsDelegate::CreateStatic(&SetDamping));
 } // namespace PolySnapDebugPrivate
 
@@ -330,11 +329,11 @@ void FPolySnapDebug::DrawSocket(const UWorld* World, const FTransform& SocketTra
 
 	// The three named directions, drawn in the level so an axis-role mistake in Blender is
 	// visible rather than inferred. These are the resolved roles rather than raw mesh axes --
-	// GetSocketWorldTransform has already applied the piece's convention -- so red is Outward
-	// whichever local axis that piece's assets put it on, and a wrong convention shows up here
+	// GetSocketWorldTransform has already applied the part's convention -- so red is Outward
+	// whichever local axis that part's assets put it on, and a wrong convention shows up here
 	// as arrows pointing somewhere the panel's geometry says they should not. The arrow colours
-	// are never overridden -- the held piece is signalled by the socket sphere below, so the
-	// axis legend still reads on the one piece whose convention you are most likely checking.
+	// are never overridden -- the held part is signalled by the socket sphere below, so the
+	// axis legend still reads on the one part whose convention you are most likely checking.
 	DrawDebugDirectionalArrow(World, Basis.Location, Basis.Location + Basis.Outward * ArrowLength, ArrowHead,
 		OutwardColour, false, -1.0f, 0, 0.6f);
 	DrawDebugDirectionalArrow(World, Basis.Location, Basis.Location + Basis.Tangent * ArrowLength, ArrowHead,
@@ -354,13 +353,13 @@ void FPolySnapDebug::DrawSocket(const UWorld* World, const FTransform& SocketTra
 #endif
 }
 
-void FPolySnapDebug::DrawPiece(const UWorld* World, const UPolySnapPieceComponent& Piece, bool bHighlighted)
+void FPolySnapDebug::DrawPart(const UWorld* World, const UPolySnapConnectorComponent& Part, bool bHighlighted)
 {
 #if ENABLE_DRAW_DEBUG
-	for (const FPolySnapSocketDescriptor& Descriptor : Piece.GetSocketDescriptors())
+	for (const FPolySnapSocketDescriptor& Descriptor : Part.GetSocketDescriptors())
 	{
-		DrawSocket(World, Piece.GetSocketWorldTransform(Descriptor.SocketName), Descriptor,
-			Piece.IsSocketConnected(Descriptor.Id), bHighlighted);
+		DrawSocket(World, Part.GetSocketWorldTransform(Descriptor.SocketName), Descriptor,
+			Part.IsSocketConnected(Descriptor.Id), bHighlighted);
 	}
 #endif
 }
@@ -396,19 +395,19 @@ void FPolySnapDebug::DrawCandidate(const UWorld* World, const FPolySnapCandidate
 #endif
 }
 
-void FPolySnapDebug::DrawPreview(const UWorld* World, const UPolySnapPieceComponent& HeldPiece,
+void FPolySnapDebug::DrawPreview(const UWorld* World, const UPolySnapConnectorComponent& HeldPart,
 	const FTransform& SolvedTransform)
 {
 #if ENABLE_DRAW_DEBUG
 	using namespace PolySnapDebugPrivate;
 
-	const UMeshComponent* Mesh = HeldPiece.GetResolvedSocketMesh();
+	const UMeshComponent* Mesh = HeldPart.GetResolvedSocketMesh();
 	if (World == nullptr || Mesh == nullptr)
 	{
 		return;
 	}
 
-	// Local bounds, re-expressed at the solved transform: where the piece lands if placed now.
+	// Local bounds, re-expressed at the solved transform: where the part lands if placed now.
 	const FBoxSphereBounds LocalBounds = Mesh->CalcBounds(FTransform::Identity);
 	DrawDebugBox(World, SolvedTransform.TransformPosition(LocalBounds.Origin), LocalBounds.BoxExtent,
 		SolvedTransform.GetRotation(), HighlightColour, false, -1.0f, 0, 0.8f);

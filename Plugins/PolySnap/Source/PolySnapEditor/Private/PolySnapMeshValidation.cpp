@@ -26,7 +26,7 @@ namespace PolySnapMeshValidationPrivate
 	return AngleDegrees <= ToleranceDegrees;
 }
 
-/** True when the piece is flat enough for the panel conventions to be meaningful. */
+/** True when the part is flat enough for the panel conventions to be meaningful. */
 [[nodiscard]] bool IsPlanar(const FBox& Bounds, double PlanarExtentRatio, int32& OutFlatAxis)
 {
 	const FVector Extent = Bounds.GetExtent();
@@ -71,8 +71,8 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 	const FBox Bounds = StaticMesh->GetBoundingBox();
 
 	// A mesh asset carries no convention of its own, and this runs from an import hook with no
-	// piece component in sight, so the project default is all there is to check against. A mesh
-	// whose piece overrides it is therefore checked against the wrong convention.
+	// part component in sight, so the project default is all there is to check against. A mesh
+	// whose part overrides it is therefore checked against the wrong convention.
 	//
 	// How wrong depends on which part differs. A Tangent sign flip -- the common case, and what a
 	// socket authored directly in Unreal looks like -- costs nothing: the edge measurement is a
@@ -121,7 +121,7 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 		{
 			OutReport.Add(EPolySnapValidationSeverity::Error,
 				FString::Printf(TEXT("Duplicate socket ID %03d: '%s' and '%s'. IDs are permanent identity and "
-									 "must be unique within a piece."),
+									 "must be unique within a part."),
 					Descriptor.Id, *Existing->ToString(), *SocketName));
 		}
 		else
@@ -165,13 +165,13 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 			if ((Basis.Outward | ToSocket) <= 0.0)
 			{
 				OutReport.Add(EPolySnapValidationSeverity::Warning,
-					FString::Printf(TEXT("Socket '%s': Outward points into the piece, or Outward and Tangent "
+					FString::Printf(TEXT("Socket '%s': Outward points into the part, or Outward and Tangent "
 										 "are swapped. A concave outline can fail this legitimately."),
 						*SocketName));
 			}
 		}
 
-		if (Settings.bWarnOnNonCanonicalPieceFrame && bPlanar)
+		if (Settings.bWarnOnNonCanonicalPartFrame && bPlanar)
 		{
 			FVector FlatAxisDirection = FVector::ZeroVector;
 			FlatAxisDirection[FlatAxis] = 1.0;
@@ -179,7 +179,7 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 			if (!IsParallel(Basis.Normal, FlatAxisDirection, Settings.AxisAlignmentToleranceDegrees))
 			{
 				OutReport.Add(EPolySnapValidationSeverity::Warning,
-					FString::Printf(TEXT("Socket '%s': Normal is not parallel to the piece's flat axis. The "
+					FString::Printf(TEXT("Socket '%s': Normal is not parallel to the part's flat axis. The "
 										 "panel was probably authored standing up, or the socket has stray roll."),
 						*SocketName));
 			}
@@ -205,7 +205,7 @@ void FPolySnapMeshValidation::Validate(const UStaticMesh* StaticMesh, FPolySnapV
 			if (!IsParallel(Basis.Outward, FVector::ForwardVector, Settings.AxisAlignmentToleranceDegrees))
 			{
 				OutReport.Add(EPolySnapValidationSeverity::Warning,
-					FString::Printf(TEXT("Socket '%s' is socket 001 but its Outward is not along the piece's "
+					FString::Printf(TEXT("Socket '%s' is socket 001 but its Outward is not along the part's "
 										 "local +X. House style, not a requirement of the snapping math."),
 						*SocketName));
 			}

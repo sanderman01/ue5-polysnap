@@ -63,14 +63,14 @@ public:
 	 * selection as unexplored; this is the placeholder, and the residual it leaves is the thing
 	 * Milestone 2 measures.
 	 *
-	 * @param HeldSockets       Sockets of the piece being placed, in world space.
+	 * @param HeldSockets       Sockets of the part being placed, in world space.
 	 * @param TargetSockets     Every other socket in range, in world space.
-	 * @param HeldPieceTransform Where the held piece currently is, which decides polarity.
+	 * @param HeldPartTransform Where the held part currently is, which decides polarity.
 	 * @param OutRejections     Optional; the pairs that failed, for the debug readout.
 	 * @return The winning candidate, or an unset candidate when nothing passed.
 	 */
 	[[nodiscard]] static FPolySnapCandidate FindBest(const TArray<FPolySnapWorldSocket>& HeldSockets,
-		const TArray<FPolySnapWorldSocket>& TargetSockets, const FTransform& HeldPieceTransform,
+		const TArray<FPolySnapWorldSocket>& TargetSockets, const FTransform& HeldPartTransform,
 		const FPolySnapQueryTolerances& Tolerances, TArray<FPolySnapRejectedPair>* OutRejections = nullptr);
 
 	/** Human-readable rejection reason, for logs and the on-screen readout. */

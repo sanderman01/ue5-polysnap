@@ -19,9 +19,9 @@
 #include "InputModifiers.h"
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include "PolySnap.h"
+#include "PolySnapConnectorComponent.h"
 #include "PolySnapDebug.h"
 #include "PolySnapGeometry.h"
-#include "PolySnapPieceComponent.h"
 #include "PolySnapSettings.h"
 #include "PolySnapSnapQuery.h"
 #include "PolySnapSubsystem.h"
@@ -33,7 +33,7 @@ constexpr double UuToMm = 10.0;
 
 /**
 	 * How far out to gather candidate sockets, as a multiple of the snap distance. Wide enough
-	 * that a piece's far socket is still considered, cheap because it only filters whole pieces.
+	 * that a part's far socket is still considered, cheap because it only filters whole parts.
 	 */
 constexpr double BroadPhaseMultiplier = 40.0;
 
@@ -49,7 +49,7 @@ UPolySnapBuilderComponent::UPolySnapBuilderComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.bStartWithTickEnabled = true;
 
-	// After the pawn has moved for the frame, so a carried piece does not lag the view by a frame.
+	// After the pawn has moved for the frame, so a carried part does not lag the view by a frame.
 	PrimaryComponentTick.TickGroup = TG_PostPhysics;
 }
 
@@ -71,9 +71,9 @@ void UPolySnapBuilderComponent::BeginPlay()
 
 void UPolySnapBuilderComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (HeldPiece != nullptr)
+	if (HeldPart != nullptr)
 	{
-		DropHeldPiece();
+		DropHeldPart();
 	}
 
 	if (APawn* Pawn = Cast<APawn>(GetOwner()))
@@ -186,19 +186,19 @@ bool UPolySnapBuilderComponent::GetViewPoint(FVector& OutLocation, FRotator& Out
 
 void UPolySnapBuilderComponent::HandleGrabOrPlace()
 {
-	if (HeldPiece != nullptr)
+	if (HeldPart != nullptr)
 	{
-		PlaceHeldPiece();
+		PlaceHeldPart();
 	}
 	else
 	{
-		GrabPieceUnderCrosshair();
+		GrabPartUnderCrosshair();
 	}
 }
 
 void UPolySnapBuilderComponent::HandleDrop()
 {
-	DropHeldPiece();
+	DropHeldPart();
 }
 
 void UPolySnapBuilderComponent::HandleRoll(const FInputActionValue& Value)
@@ -218,9 +218,9 @@ void UPolySnapBuilderComponent::HandleHoldDistance(const FInputActionValue& Valu
 		static_cast<double>(Settings.MinHoldDistanceUu), static_cast<double>(Settings.MaxHoldDistanceUu));
 }
 
-bool UPolySnapBuilderComponent::GrabPieceUnderCrosshair()
+bool UPolySnapBuilderComponent::GrabPartUnderCrosshair()
 {
-	if (HeldPiece != nullptr)
+	if (HeldPart != nullptr)
 	{
 		return false;
 	}
@@ -249,60 +249,60 @@ bool UPolySnapBuilderComponent::GrabPieceUnderCrosshair()
 	}
 
 	AActor* HitActor = Hit.GetActor();
-	UPolySnapPieceComponent* Piece =
-		HitActor != nullptr ? HitActor->FindComponentByClass<UPolySnapPieceComponent>() : nullptr;
+	UPolySnapConnectorComponent* Part =
+		HitActor != nullptr ? HitActor->FindComponentByClass<UPolySnapConnectorComponent>() : nullptr;
 
-	if (Piece == nullptr)
+	if (Part == nullptr)
 	{
 		return false;
 	}
 
-	if (Piece->IsAnchored())
+	if (Part->IsAnchored())
 	{
 		UE_LOG(LogPolySnap, Verbose, TEXT("'%s' is anchored and cannot be picked up."), *HitActor->GetName());
 		return false;
 	}
 
-	HeldPiece = Piece;
-	HeldPiece->SetSimulating(false);
+	HeldPart = Part;
+	HeldPart->SetSimulating(false);
 
-	// Carry the piece at the orientation it was already in, expressed relative to the view, so
+	// Carry the part at the orientation it was already in, expressed relative to the view, so
 	// picking something up never jerks it round. Roll is then the player's to add.
-	HeldRelativeRotation = ViewRotation.Quaternion().Inverse() * Piece->GetPieceTransform().GetRotation();
+	HeldRelativeRotation = ViewRotation.Quaternion().Inverse() * Part->GetPartTransform().GetRotation();
 	HeldRollDegrees = 0.0;
-	HoldDistanceUu = FMath::Clamp(FVector::Dist(ViewLocation, Piece->GetPieceTransform().GetLocation()),
+	HoldDistanceUu = FMath::Clamp(FVector::Dist(ViewLocation, Part->GetPartTransform().GetLocation()),
 		static_cast<double>(Settings.MinHoldDistanceUu), static_cast<double>(Settings.MaxHoldDistanceUu));
 
 	if (UPolySnapSubsystem* Subsystem = UPolySnapSubsystem::Get(this))
 	{
-		Subsystem->SetHeldPiece(HeldPiece);
+		Subsystem->SetHeldPart(HeldPart);
 	}
 
 	return true;
 }
 
-void UPolySnapBuilderComponent::DropHeldPiece()
+void UPolySnapBuilderComponent::DropHeldPart()
 {
-	if (HeldPiece == nullptr)
+	if (HeldPart == nullptr)
 	{
 		return;
 	}
 
-	HeldPiece->SetSimulating(true);
+	HeldPart->SetSimulating(true);
 
 	if (UPolySnapSubsystem* Subsystem = UPolySnapSubsystem::Get(this))
 	{
-		Subsystem->SetHeldPiece(nullptr);
+		Subsystem->SetHeldPart(nullptr);
 	}
 
-	HeldPiece = nullptr;
+	HeldPart = nullptr;
 	CurrentCandidate = FPolySnapCandidate();
 }
 
-void UPolySnapBuilderComponent::UpdateHeldPieceTransform()
+void UPolySnapBuilderComponent::UpdateHeldPartTransform()
 {
-	AActor* PieceActor = HeldPiece != nullptr ? HeldPiece->GetOwner() : nullptr;
-	if (PieceActor == nullptr)
+	AActor* PartActor = HeldPart != nullptr ? HeldPart->GetOwner() : nullptr;
+	if (PartActor == nullptr)
 	{
 		return;
 	}
@@ -320,12 +320,12 @@ void UPolySnapBuilderComponent::UpdateHeldPieceTransform()
 	// orientation freedom the player would otherwise be missing.
 	const FQuat Roll(ViewQuat.GetForwardVector(), FMath::DegreesToRadians(HeldRollDegrees));
 
-	// FQuat composes right to left, so this reads as: the piece's grab-time offset, then the
+	// FQuat composes right to left, so this reads as: the part's grab-time offset, then the
 	// current view, then the player's roll.
 	const FQuat DesiredRotation = Roll * ViewQuat * HeldRelativeRotation;
 	const FVector DesiredLocation = ViewLocation + ViewQuat.GetForwardVector() * HoldDistanceUu;
 
-	PieceActor->SetActorLocationAndRotation(DesiredLocation, DesiredRotation, false, nullptr,
+	PartActor->SetActorLocationAndRotation(DesiredLocation, DesiredRotation, false, nullptr,
 		ETeleportType::TeleportPhysics);
 }
 
@@ -334,37 +334,37 @@ void UPolySnapBuilderComponent::UpdateCandidate()
 	CurrentCandidate = FPolySnapCandidate();
 
 	const UPolySnapSubsystem* Subsystem = UPolySnapSubsystem::Get(this);
-	if (HeldPiece == nullptr || Subsystem == nullptr)
+	if (HeldPart == nullptr || Subsystem == nullptr)
 	{
 		return;
 	}
 
 	const FPolySnapQueryTolerances Tolerances = UPolySnapSubsystem::GetQueryTolerances();
-	const FTransform HeldPieceTransform = HeldPiece->GetPieceTransform();
+	const FTransform HeldPartTransform = HeldPart->GetPartTransform();
 
 	TArray<FPolySnapWorldSocket> HeldSockets;
-	HeldPiece->AppendWorldSockets(HeldSockets);
+	HeldPart->AppendWorldSockets(HeldSockets);
 
 	TArray<FPolySnapWorldSocket> TargetSockets;
-	Subsystem->GatherWorldSockets(HeldPiece, HeldPieceTransform.GetLocation(),
+	Subsystem->GatherWorldSockets(HeldPart, HeldPartTransform.GetLocation(),
 		Tolerances.SnapDistanceUu * PolySnapBuilderPrivate::BroadPhaseMultiplier, TargetSockets);
 
-	CurrentCandidate = FPolySnapSnapQuery::FindBest(HeldSockets, TargetSockets, HeldPieceTransform, Tolerances);
+	CurrentCandidate = FPolySnapSnapQuery::FindBest(HeldSockets, TargetSockets, HeldPartTransform, Tolerances);
 }
 
-void UPolySnapBuilderComponent::PlaceHeldPiece()
+void UPolySnapBuilderComponent::PlaceHeldPart()
 {
-	if (HeldPiece == nullptr)
+	if (HeldPart == nullptr)
 	{
 		return;
 	}
 
-	UPolySnapPieceComponent* Piece = HeldPiece;
-	AActor* PieceActor = Piece->GetOwner();
+	UPolySnapConnectorComponent* Part = HeldPart;
+	AActor* PartActor = Part->GetOwner();
 
-	if (!CurrentCandidate.IsSet() || PieceActor == nullptr)
+	if (!CurrentCandidate.IsSet() || PartActor == nullptr)
 	{
-		DropHeldPiece();
+		DropHeldPart();
 		return;
 	}
 
@@ -373,26 +373,26 @@ void UPolySnapBuilderComponent::PlaceHeldPiece()
 	// The anchor's mating conditions hold to float precision at this instant, and only at this
 	// instant -- the next physics tick perturbs everything, the anchor included. Measuring here is
 	// what makes the error diagnosable where it is introduced.
-	PieceActor->SetActorTransform(Candidate.SolvedPieceTransform, false, nullptr, ETeleportType::TeleportPhysics);
+	PartActor->SetActorTransform(Candidate.SolvedPartTransform, false, nullptr, ETeleportType::TeleportPhysics);
 
-	const FTransform PlacedHeldSocket = Piece->GetSocketWorldTransform(Candidate.HeldSocket.Descriptor.SocketName);
+	const FTransform PlacedHeldSocket = Part->GetSocketWorldTransform(Candidate.HeldSocket.Descriptor.SocketName);
 	const FTransform PlacedTargetSocket =
-		Candidate.TargetSocket.Piece.IsValid()
-			? Candidate.TargetSocket.Piece->GetSocketWorldTransform(Candidate.TargetSocket.Descriptor.SocketName)
+		Candidate.TargetSocket.Part.IsValid()
+			? Candidate.TargetSocket.Part->GetSocketWorldTransform(Candidate.TargetSocket.Descriptor.SocketName)
 			: Candidate.TargetSocket.WorldTransform;
 
 	const double ResidualUu = FVector::Dist(PlacedHeldSocket.GetLocation(), PlacedTargetSocket.GetLocation());
 
 	CommitConnection(Candidate, ResidualUu);
-	DropHeldPiece();
+	DropHeldPart();
 }
 
 void UPolySnapBuilderComponent::CommitConnection(const FPolySnapCandidate& Candidate, double ResidualUu)
 {
-	UPolySnapPieceComponent* HeldPieceComponent = Candidate.HeldSocket.Piece.Get();
-	UPolySnapPieceComponent* TargetPieceComponent = Candidate.TargetSocket.Piece.Get();
+	UPolySnapConnectorComponent* HeldConnector = Candidate.HeldSocket.Part.Get();
+	UPolySnapConnectorComponent* TargetConnector = Candidate.TargetSocket.Part.Get();
 
-	if (HeldPieceComponent == nullptr || TargetPieceComponent == nullptr)
+	if (HeldConnector == nullptr || TargetConnector == nullptr)
 	{
 		return;
 	}
@@ -403,34 +403,34 @@ void UPolySnapBuilderComponent::CommitConnection(const FPolySnapCandidate& Candi
 	// joint of degree three will need without a special case.
 	FPolySnapConnection HeldSide;
 	HeldSide.LocalSocketId = Candidate.HeldSocket.Descriptor.Id;
-	HeldSide.OtherPiece = TargetPieceComponent;
+	HeldSide.OtherPart = TargetConnector;
 	HeldSide.OtherSocketId = Candidate.TargetSocket.Descriptor.Id;
 	HeldSide.bWasAnchor = true;
 	HeldSide.ResidualMm = ResidualMm;
-	HeldPieceComponent->AddConnection(HeldSide);
+	HeldConnector->AddConnection(HeldSide);
 
 	FPolySnapConnection TargetSide;
 	TargetSide.LocalSocketId = Candidate.TargetSocket.Descriptor.Id;
-	TargetSide.OtherPiece = HeldPieceComponent;
+	TargetSide.OtherPart = HeldConnector;
 	TargetSide.OtherSocketId = Candidate.HeldSocket.Descriptor.Id;
 	TargetSide.bWasAnchor = true;
 	TargetSide.ResidualMm = ResidualMm;
-	TargetPieceComponent->AddConnection(TargetSide);
+	TargetConnector->AddConnection(TargetSide);
 
 	UE_LOG(LogPolySnap, Log,
 		TEXT("Snapped '%s' socket %03d to '%s' socket %03d: polarity %s, dihedral %.3f deg, residual %.4f mm."),
-			*GetNameSafe(HeldPieceComponent->GetOwner()), HeldSide.LocalSocketId,
-			*GetNameSafe(TargetPieceComponent->GetOwner()), TargetSide.LocalSocketId,
+			*GetNameSafe(HeldConnector->GetOwner()), HeldSide.LocalSocketId, *GetNameSafe(TargetConnector->GetOwner()),
+			TargetSide.LocalSocketId,
 			Candidate.Polarity == EPolySnapPolarity::Aligned ? TEXT("aligned")
 															 : TEXT("flipped"), Candidate.DihedralDegrees, ResidualMm);
 
 	// Simulation is enabled before the constraint is created, because the constraint needs live
 	// body instances on both sides to bind to.
-	HeldPieceComponent->SetSimulating(true);
+	HeldConnector->SetSimulating(true);
 
-	UMeshComponent* HeldMesh = HeldPieceComponent->GetResolvedSocketMesh();
-	UMeshComponent* TargetMesh = TargetPieceComponent->GetResolvedSocketMesh();
-	AActor* TargetActor = TargetPieceComponent->GetOwner();
+	UMeshComponent* HeldMesh = HeldConnector->GetResolvedSocketMesh();
+	UMeshComponent* TargetMesh = TargetConnector->GetResolvedSocketMesh();
+	AActor* TargetActor = TargetConnector->GetOwner();
 
 	if (HeldMesh == nullptr || TargetMesh == nullptr || TargetActor == nullptr)
 	{
@@ -438,7 +438,7 @@ void UPolySnapBuilderComponent::CommitConnection(const FPolySnapCandidate& Candi
 	}
 
 	const FTransform JointTransform =
-		TargetPieceComponent->GetSocketWorldTransform(Candidate.TargetSocket.Descriptor.SocketName);
+		TargetConnector->GetSocketWorldTransform(Candidate.TargetSocket.Descriptor.SocketName);
 	const FPolySnapSocketBasis JointBasis = FPolySnapGeometry::BasisFromTransform(JointTransform);
 
 	UPhysicsConstraintComponent* Constraint = NewObject<UPhysicsConstraintComponent>(TargetActor);
@@ -473,9 +473,9 @@ void UPolySnapBuilderComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (HeldPiece != nullptr)
+	if (HeldPart != nullptr)
 	{
-		UpdateHeldPieceTransform();
+		UpdateHeldPartTransform();
 		UpdateCandidate();
 	}
 
@@ -494,18 +494,18 @@ void UPolySnapBuilderComponent::DrawDebug() const
 
 	const UWorld* World = GetWorld();
 
-	if (HeldPiece != nullptr)
+	if (HeldPart != nullptr)
 	{
-		FPolySnapDebug::DrawPiece(World, *HeldPiece, true);
+		FPolySnapDebug::DrawPart(World, *HeldPart, true);
 	}
 
 	if (CurrentCandidate.IsSet())
 	{
 		FPolySnapDebug::DrawCandidate(World, CurrentCandidate);
 
-		if (HeldPiece != nullptr)
+		if (HeldPart != nullptr)
 		{
-			FPolySnapDebug::DrawPreview(World, *HeldPiece, CurrentCandidate.SolvedPieceTransform);
+			FPolySnapDebug::DrawPreview(World, *HeldPart, CurrentCandidate.SolvedPartTransform);
 		}
 	}
 
@@ -515,9 +515,9 @@ void UPolySnapBuilderComponent::DrawDebug() const
 	}
 
 	GEngine->AddOnScreenDebugMessage(ReadoutKeyHeld, 0.0f, FColor::White,
-		HeldPiece != nullptr ? FString::Printf(TEXT("PolySnap: holding %s  (F place, G drop, Q/E roll, wheel %.0f cm)"),
-								   *GetNameSafe(HeldPiece->GetOwner()), HoldDistanceUu)
-							 : FString(TEXT("PolySnap: nothing held  (F to grab)")));
+		HeldPart != nullptr ? FString::Printf(TEXT("PolySnap: holding %s  (F place, G drop, Q/E roll, wheel %.0f cm)"),
+								  *GetNameSafe(HeldPart->GetOwner()), HoldDistanceUu)
+							: FString(TEXT("PolySnap: nothing held  (F to grab)")));
 
 	if (CurrentCandidate.IsSet())
 	{
@@ -532,7 +532,7 @@ void UPolySnapBuilderComponent::DrawDebug() const
 				? TEXT("aligned")
 				: TEXT("flipped"), CurrentCandidate.DihedralDegrees, CurrentCandidate.RequiredRotationDegrees));
 	}
-	else if (HeldPiece != nullptr)
+	else if (HeldPart != nullptr)
 	{
 		GEngine->AddOnScreenDebugMessage(ReadoutKeyCandidate, 0.0f, FColor::Silver,
 			TEXT("  no candidate in tolerance"));

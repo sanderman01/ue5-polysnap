@@ -6,7 +6,7 @@
 
 #include "PolySnapTypes.generated.h"
 
-class UPolySnapPieceComponent;
+class UPolySnapConnectorComponent;
 
 /**
  * Edge geometry of a socket, the first of the three compatibility terms (DESIGN section 2.2).
@@ -27,7 +27,7 @@ enum class EPolySnapEdgeSubType : uint8
 };
 
 /**
- * A socket name parsed into its fields, cached once per piece and never re-parsed.
+ * A socket name parsed into its fields, cached once per part and never re-parsed.
  *
  * Runtime compatibility tests operate on these fields; nothing string-compares a socket name
  * during a snap query.
@@ -42,7 +42,7 @@ struct POLYSNAP_API FPolySnapSocketDescriptor
 	FName SocketName;
 
 	/**
-	 * Identity within the piece, 1-999. Permanent: save games store it, so a removed socket's ID
+	 * Identity within the part, 1-999. Permanent: save games store it, so a removed socket's ID
 	 * is retired rather than reassigned. Never participates in compatibility.
 	 */
 	UPROPERTY(BlueprintReadOnly, Category = "PolySnap")
@@ -134,7 +134,7 @@ struct POLYSNAP_API FPolySnapSocketAxes
 {
 	GENERATED_BODY()
 
-	/** In the plane of the panel, perpendicular to the edge, away from the piece's centre. */
+	/** In the plane of the panel, perpendicular to the edge, away from the part's centre. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PolySnap")
 	EPolySnapSocketAxis OutwardAxis = EPolySnapSocketAxis::PlusX;
 
@@ -188,7 +188,7 @@ struct POLYSNAP_API FPolySnapSocketBasis
 	/** Socket position, in whatever space the source transform was in. */
 	FVector Location = FVector::ZeroVector;
 
-	/** In the plane of the panel, perpendicular to the edge, away from the piece's centre. Local +X. */
+	/** In the plane of the panel, perpendicular to the edge, away from the part's centre. Local +X. */
 	FVector Outward = FVector::ForwardVector;
 
 	/** Along the edge. Local -Y. */
@@ -210,25 +210,25 @@ enum class EPolySnapPolarity : uint8
 	/** Tangent_B == -Tangent_A. Surface orientation is consistent across the joint. */
 	Aligned,
 
-	/** Tangent_B == +Tangent_A. Piece B is turned over; its outward face now points the other way. */
+	/** Tangent_B == +Tangent_A. Part B is turned over; its outward face now points the other way. */
 	Flipped
 };
 
 /**
- * One socket of one piece, resolved into world space. The unit the candidate search works on.
+ * One socket of one part, resolved into world space. The unit the candidate search works on.
  *
  * The search takes an array of these rather than reaching into actors, which is what keeps it
  * pure and testable without a world.
  */
 struct POLYSNAP_API FPolySnapWorldSocket
 {
-	/** The piece this socket belongs to. Null is legal, and is what the automation specs use. */
-	TWeakObjectPtr<UPolySnapPieceComponent> Piece;
+	/** The part this socket belongs to. Null is legal, and is what the automation specs use. */
+	TWeakObjectPtr<UPolySnapConnectorComponent> Part;
 
 	/** Parsed fields. Compatibility is decided from these alone. */
 	FPolySnapSocketDescriptor Descriptor;
 
-	/** The socket's world transform, as baked into the mesh and moved by its piece. */
+	/** The socket's world transform, as baked into the mesh and moved by its part. */
 	FTransform WorldTransform = FTransform::Identity;
 
 	/** True when the socket already participates in a connection. */
@@ -239,7 +239,7 @@ struct POLYSNAP_API FPolySnapWorldSocket
 enum class EPolySnapRejection : uint8
 {
 	None,
-	SamePiece,
+	SamePart,
 	Incompatible,
 	TooFar,
 	TangentNotCollinear,
@@ -248,18 +248,18 @@ enum class EPolySnapRejection : uint8
 
 /**
  * A socket pair that passed every test in DESIGN section 2.5, together with the placement it
- * implies. Exactly one candidate becomes the anchor, and the piece's transform is solved from
+ * implies. Exactly one candidate becomes the anchor, and the part's transform is solved from
  * the anchor and from nothing else.
  */
 struct POLYSNAP_API FPolySnapCandidate
 {
-	/** The socket on the piece being placed. */
+	/** The socket on the part being placed. */
 	FPolySnapWorldSocket HeldSocket;
 
 	/** The socket already in the world that it would mate with. */
 	FPolySnapWorldSocket TargetSocket;
 
-	/** Which way round the held piece ends up. Chosen by least rotation from its current pose. */
+	/** Which way round the held part ends up. Chosen by least rotation from its current pose. */
 	EPolySnapPolarity Polarity = EPolySnapPolarity::Aligned;
 
 	/** Signed dihedral in the target socket's basis, over [0, 360). */
@@ -271,22 +271,22 @@ struct POLYSNAP_API FPolySnapCandidate
 	/** Angle between the two tangent lines before the snap, in degrees, ignoring polarity. */
 	double TangentAngleDegrees = 0.0;
 
-	/** How far the held piece has to rotate to reach the solved pose, in degrees. */
+	/** How far the held part has to rotate to reach the solved pose, in degrees. */
 	double RequiredRotationDegrees = 0.0;
 
 	/** Dimensionless anchor score; lower wins. See FPolySnapSnapQuery::FindBest. */
 	double Cost = 0.0;
 
-	/** The world transform the held piece takes if this candidate is committed. */
-	FTransform SolvedPieceTransform = FTransform::Identity;
+	/** The world transform the held part takes if this candidate is committed. */
+	FTransform SolvedPartTransform = FTransform::Identity;
 
 	[[nodiscard]] bool IsSet() const { return HeldSocket.Descriptor.IsValid() && TargetSocket.Descriptor.IsValid(); }
 };
 
 /**
- * One socket's participation in a connection, recorded on the piece that owns the socket.
+ * One socket's participation in a connection, recorded on the part that owns the socket.
  *
- * Milestone 1 records connections directly between pieces. DESIGN section 2.4's first-class
+ * Milestone 1 records connections directly between parts. DESIGN section 2.4's first-class
  * Joint -- a shared edge line hosting two or more sockets -- arrives with the assembly graph in
  * Milestone 3, and this struct is what it will grow out of.
  */
@@ -295,15 +295,15 @@ struct POLYSNAP_API FPolySnapConnection
 {
 	GENERATED_BODY()
 
-	/** ID of the socket on this piece that is participating. */
+	/** ID of the socket on this part that is participating. */
 	UPROPERTY()
 	int32 LocalSocketId = 0;
 
-	/** The piece on the other side of the seam. */
+	/** The part on the other side of the seam. */
 	UPROPERTY()
-	TWeakObjectPtr<UPolySnapPieceComponent> OtherPiece;
+	TWeakObjectPtr<UPolySnapConnectorComponent> OtherPart;
 
-	/** ID of the participating socket on that piece. */
+	/** ID of the participating socket on that part. */
 	UPROPERTY()
 	int32 OtherSocketId = 0;
 

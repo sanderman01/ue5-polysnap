@@ -244,8 +244,8 @@ void FPolySnapSocketAxesSpec::Define()
 				[this]()
 				{
 					// A repeated axis makes the third row a zero cross product. Left to reach
-					// FMatrix, that becomes a normalised quaternion of nonsense and pieces land
-					// at garbage transforms; a piece that simply did not move is far easier to see.
+					// FMatrix, that becomes a normalised quaternion of nonsense and parts land
+					// at garbage transforms; a part that simply did not move is far easier to see.
 					const FPolySnapSocketAxes Axes =
 						MakeAxes(EPolySnapSocketAxis::PlusX, EPolySnapSocketAxis::MinusX, EPolySnapSocketAxis::PlusZ);
 
@@ -253,7 +253,7 @@ void FPolySnapSocketAxesSpec::Define()
 				});
 		});
 
-	Describe("a piece authored to a non-default mapping",
+	Describe("a part authored to a non-default mapping",
 		[this]()
 		{
 			It("stores the calibration socket with its declared axes on the panel's real directions",
@@ -289,8 +289,8 @@ void FPolySnapSocketAxesSpec::Define()
 								 + TEXT(" round trip"), Canonical.Equals(PrimarySocketLocal(), 1.0e-6));
 
 						const FPolySnapSocketBasis Anchor = FPolySnapGeometry::BasisFromTransform(Canonical);
-						const FTransform Solved = FPolySnapGeometry::SolvePieceTransform(Canonical, Anchor,
-							EPolySnapPolarity::Aligned, 180.0);
+						const FTransform Solved =
+							FPolySnapGeometry::SolvePartTransform(Canonical, Anchor, EPolySnapPolarity::Aligned, 180.0);
 
 						TestEqual(MappingName(Axes)
 								  + TEXT(" location"), Solved.GetLocation(), FVector(2.0 * HalfPanelUu, 0.0, 0.0),

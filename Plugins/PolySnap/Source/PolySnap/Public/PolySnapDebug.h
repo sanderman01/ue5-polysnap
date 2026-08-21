@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "PolySnapTypes.h"
 
-class UPolySnapPieceComponent;
+class UPolySnapConnectorComponent;
 class UWorld;
 
 /**
@@ -14,7 +14,7 @@ class UWorld;
  * Driven entirely by console variables, so what is drawn can be changed mid-session without a
  * rebuild or a rebind:
  *
- *     PolySnap.Debug.Draw         0 off, 1 held piece and candidates, 2 every registered piece
+ *     PolySnap.Debug.Draw         0 off, 1 held part and candidates, 2 every registered part
  *     PolySnap.Debug.Text         on-screen readout
  *     PolySnap.Debug.MaxDistance  culling distance in Unreal units
  *     PolySnap.Debug.GizmoScale   size multiplier for the socket gizmos
@@ -26,7 +26,7 @@ class UWorld;
 class POLYSNAP_API FPolySnapDebug
 {
 public:
-	/** 0 off, 1 held piece and candidates only, 2 every registered piece. */
+	/** 0 off, 1 held part and candidates only, 2 every registered part. */
 	[[nodiscard]] static int32 GetDrawMode();
 
 	/** Whether the on-screen readout is enabled. */
@@ -48,14 +48,14 @@ public:
 	static void DrawSocket(const UWorld* World, const FTransform& SocketTransform,
 		const FPolySnapSocketDescriptor& Descriptor, bool bConnected, bool bHighlighted);
 
-	/** Draws every socket on one piece. */
-	static void DrawPiece(const UWorld* World, const UPolySnapPieceComponent& Piece, bool bHighlighted);
+	/** Draws every socket on one part. */
+	static void DrawPart(const UWorld* World, const UPolySnapConnectorComponent& Part, bool bHighlighted);
 
 	/** Draws the link between the two sockets of a candidate pair, with the gap and angle. */
 	static void DrawCandidate(const UWorld* World, const FPolySnapCandidate& Candidate);
 
-	/** Draws where a held piece would land if placed now: its bounds as a wireframe box. */
-	static void DrawPreview(const UWorld* World, const UPolySnapPieceComponent& HeldPiece,
+	/** Draws where a held part would land if placed now: its bounds as a wireframe box. */
+	static void DrawPreview(const UWorld* World, const UPolySnapConnectorComponent& HeldPart,
 		const FTransform& SolvedTransform);
 
 	/**

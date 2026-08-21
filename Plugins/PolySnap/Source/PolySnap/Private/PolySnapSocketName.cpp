@@ -169,7 +169,7 @@ EPolySnapParseResult FPolySnapSocketName::Parse(FStringView SocketName, FPolySna
 
 	// The tail is stripped first and never looked at again. Doing it in this order is what lets a
 	// hex and a pent share a .blend: the duplicate ID they would otherwise appear to have is
-	// Blender's suffix, and the real duplicate-ID check runs on stripped names, per piece.
+	// Blender's suffix, and the real duplicate-ID check runs on stripped names, per part.
 	FStringView Head;
 	FStringView Tail;
 	SplitAuthoringTail(SocketName, Head, Tail);

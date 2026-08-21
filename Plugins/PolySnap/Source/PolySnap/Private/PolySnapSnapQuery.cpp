@@ -2,16 +2,16 @@
 
 #include "PolySnapSnapQuery.h"
 
+#include "PolySnapConnectorComponent.h"
 #include "PolySnapGeometry.h"
-#include "PolySnapPieceComponent.h"
 
 EPolySnapRejection FPolySnapSnapQuery::TestPair(const FPolySnapWorldSocket& HeldSocket,
 	const FPolySnapWorldSocket& TargetSocket, const FPolySnapQueryTolerances& Tolerances,
 	FPolySnapCandidate& OutCandidate)
 {
-	if (HeldSocket.Piece.IsValid() && HeldSocket.Piece == TargetSocket.Piece)
+	if (HeldSocket.Part.IsValid() && HeldSocket.Part == TargetSocket.Part)
 	{
-		return EPolySnapRejection::SamePiece;
+		return EPolySnapRejection::SamePart;
 	}
 
 	// Cheap comparison, so it goes first: FName equality is an interned-index compare, not a string
@@ -61,9 +61,9 @@ bool FPolySnapSnapQuery::JointAcceptsParticipant(const FPolySnapWorldSocket& Hel
 	// By default a joint accepts another participant: several panels may meet along one shared
 	// edge line, so an occupied socket is not a closed one. Milestone 1 draws the line at a pair
 	// that is already connected to each other, which is bookkeeping rather than capacity.
-	if (const UPolySnapPieceComponent* HeldPiece = HeldSocket.Piece.Get())
+	if (const UPolySnapConnectorComponent* HeldPart = HeldSocket.Part.Get())
 	{
-		if (HeldPiece->IsConnectedTo(TargetSocket.Piece.Get(), TargetSocket.Descriptor.Id, HeldSocket.Descriptor.Id))
+		if (HeldPart->IsConnectedTo(TargetSocket.Part.Get(), TargetSocket.Descriptor.Id, HeldSocket.Descriptor.Id))
 		{
 			return false;
 		}
@@ -73,7 +73,7 @@ bool FPolySnapSnapQuery::JointAcceptsParticipant(const FPolySnapWorldSocket& Hel
 }
 
 FPolySnapCandidate FPolySnapSnapQuery::FindBest(const TArray<FPolySnapWorldSocket>& HeldSockets,
-	const TArray<FPolySnapWorldSocket>& TargetSockets, const FTransform& HeldPieceTransform,
+	const TArray<FPolySnapWorldSocket>& TargetSockets, const FTransform& HeldPartTransform,
 	const FPolySnapQueryTolerances& Tolerances, TArray<FPolySnapRejectedPair>* OutRejections)
 {
 	FPolySnapCandidate Best;
@@ -81,9 +81,9 @@ FPolySnapCandidate FPolySnapSnapQuery::FindBest(const TArray<FPolySnapWorldSocke
 
 	for (const FPolySnapWorldSocket& HeldSocket : HeldSockets)
 	{
-		// The held socket's transform relative to its piece. Solving needs this rather than the
-		// world transform, because the answer is where the PIECE goes.
-		const FTransform HeldSocketLocal = HeldSocket.WorldTransform.GetRelativeTransform(HeldPieceTransform);
+		// The held socket's transform relative to its part. Solving needs this rather than the
+		// world transform, because the answer is where the PART goes.
+		const FTransform HeldSocketLocal = HeldSocket.WorldTransform.GetRelativeTransform(HeldPartTransform);
 
 		for (const FPolySnapWorldSocket& TargetSocket : TargetSockets)
 		{
@@ -93,9 +93,9 @@ FPolySnapCandidate FPolySnapSnapQuery::FindBest(const TArray<FPolySnapWorldSocke
 			if (Rejection != EPolySnapRejection::None)
 			{
 				if (OutRejections != nullptr && Rejection != EPolySnapRejection::Incompatible
-					&& Rejection != EPolySnapRejection::SamePiece)
+					&& Rejection != EPolySnapRejection::SamePart)
 				{
-					// Incompatible and same-piece pairs are the overwhelming majority and say
+					// Incompatible and same-part pairs are the overwhelming majority and say
 					// nothing useful, so they are dropped rather than filling the readout.
 					OutRejections->Add(FPolySnapRejectedPair{HeldSocket.Descriptor.SocketName,
 						TargetSocket.Descriptor.SocketName, Rejection, Candidate.GapUu, Candidate.TangentAngleDegrees});
@@ -106,10 +106,10 @@ FPolySnapCandidate FPolySnapSnapQuery::FindBest(const TArray<FPolySnapWorldSocke
 
 			const FPolySnapSocketBasis TargetBasis = FPolySnapGeometry::BasisFromTransform(TargetSocket.WorldTransform);
 
-			FPolySnapGeometry::SolveNearestPlacement(HeldSocketLocal, HeldPieceTransform, TargetBasis,
+			FPolySnapGeometry::SolveNearestPlacement(HeldSocketLocal, HeldPartTransform, TargetBasis,
 				Candidate.Polarity, Candidate.DihedralDegrees, Candidate.RequiredRotationDegrees);
 
-			Candidate.SolvedPieceTransform = FPolySnapGeometry::SolvePieceTransform(HeldSocketLocal, TargetBasis,
+			Candidate.SolvedPartTransform = FPolySnapGeometry::SolvePartTransform(HeldSocketLocal, TargetBasis,
 				Candidate.Polarity, Candidate.DihedralDegrees);
 
 			Candidate.Cost = Candidate.GapUu / Tolerances.SnapDistanceUu
@@ -132,8 +132,8 @@ FString FPolySnapSnapQuery::RejectionToString(EPolySnapRejection Rejection)
 	{
 		case EPolySnapRejection::None:
 			return TEXT("accepted");
-		case EPolySnapRejection::SamePiece:
-			return TEXT("same piece");
+		case EPolySnapRejection::SamePart:
+			return TEXT("same part");
 		case EPolySnapRejection::Incompatible:
 			return TEXT("incompatible subtype or size");
 		case EPolySnapRejection::TooFar:

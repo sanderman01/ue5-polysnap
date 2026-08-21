@@ -3,7 +3,7 @@
 	"Version": 1,
 	"VersionName": "0.1",
 	"FriendlyName": "PolySnap",
-	"Description": "Node-based edge snapping: pieces connect to each other through authored edge sockets rather than to a global grid.",
+	"Description": "Node-based edge snapping: parts connect to each other through authored edge sockets rather than to a global grid.",
 	"Category": "Building",
 	"CreatedBy": "Alexander Verbeek",
 	"CreatedByURL": "",

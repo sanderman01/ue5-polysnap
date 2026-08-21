@@ -121,7 +121,7 @@ void FPolySnapSocketNameSpec::Define()
 				[this]()
 				{
 					// The suffix is a symptom; the duplicated ID it implies is the error, and that is
-					// detected separately, per piece, on stripped names. The validator's numeric-tail
+					// detected separately, per part, on stripped names. The validator's numeric-tail
 					// warning reads this same split, so it fires on the imported _001 too.
 					TestEqual("result", ParseName(TEXT("Edge_003_Straight_40_2000_001")), TEXT("Parsed"));
 					TestEqual("id", Descriptor.Id, 3);
@@ -251,7 +251,7 @@ void FPolySnapSocketNameSpec::Define()
 					// A tailed old name is the one case the parser cannot catch. It has five fields,
 					// and now that a size token may be any word, 'Pent' is a legal length -- so this
 					// parses as thickness 2000, length Pent. Nothing is silently mis-sized by it: a
-					// piece named this way mates only with another named identically. The field
+					// part named this way mates only with another named identically. The field
 					// count above is what makes the old grammar loud; opaque tokens are what make
 					// this case quiet, and that trade buys unit-free naming.
 					TestEqual("tailed", ParseName(TEXT("Edge_004_Straight_2000_Pent")), TEXT("Parsed"));

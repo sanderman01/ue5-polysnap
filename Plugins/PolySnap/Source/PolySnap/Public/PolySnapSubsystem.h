@@ -9,10 +9,10 @@
 
 #include "PolySnapSubsystem.generated.h"
 
-class UPolySnapPieceComponent;
+class UPolySnapConnectorComponent;
 
 /**
- * The world's registry of PolySnap pieces, and the one place the global debug pass runs from.
+ * The world's registry of PolySnap parts, and the one place the global debug pass runs from.
  *
  * DESIGN section 2.8 says the assembly graph should be maintained incrementally rather than
  * rebuilt by scanning the world; this registry is where that graph will live once Milestone 3
@@ -33,39 +33,39 @@ public:
 	virtual TStatId GetStatId() const override;
 	//~ End FTickableGameObject interface
 
-	/** Called by a piece at BeginPlay. */
-	void RegisterPiece(UPolySnapPieceComponent* Piece);
+	/** Called by a part at BeginPlay. */
+	void RegisterPart(UPolySnapConnectorComponent* Part);
 
-	/** Called by a piece at EndPlay. */
-	void UnregisterPiece(UPolySnapPieceComponent* Piece);
+	/** Called by a part at EndPlay. */
+	void UnregisterPart(UPolySnapConnectorComponent* Part);
 
-	const TArray<TWeakObjectPtr<UPolySnapPieceComponent>>& GetRegisteredPieces() const { return RegisteredPieces; }
+	const TArray<TWeakObjectPtr<UPolySnapConnectorComponent>>& GetRegisteredParts() const { return RegisteredParts; }
 
 	/**
-	 * Every socket in the world, excluding one piece's own, resolved into world space and
+	 * Every socket in the world, excluding one part's own, resolved into world space and
 	 * filtered to those within SearchRadiusUu of Origin.
 	 *
-	 * The radius is a broad-phase filter on the piece, not the section 2.5 proximity test -- that
+	 * The radius is a broad-phase filter on the part, not the section 2.5 proximity test -- that
 	 * one runs per socket pair, at a much tighter tolerance.
 	 */
-	void GatherWorldSockets(const UPolySnapPieceComponent* ExcludePiece, const FVector& Origin, double SearchRadiusUu,
-		TArray<FPolySnapWorldSocket>& OutSockets) const;
+	void GatherWorldSockets(const UPolySnapConnectorComponent* ExcludePart, const FVector& Origin,
+		double SearchRadiusUu, TArray<FPolySnapWorldSocket>& OutSockets) const;
 
 	/** The current tolerances, read from UPolySnapSettings. */
 	[[nodiscard]] static FPolySnapQueryTolerances GetQueryTolerances();
 
 	/**
-	 * Marks a piece as held, so the global debug pass can highlight it and skip drawing it twice.
+	 * Marks a part as held, so the global debug pass can highlight it and skip drawing it twice.
 	 * Passing null clears it.
 	 */
-	void SetHeldPiece(UPolySnapPieceComponent* Piece);
+	void SetHeldPart(UPolySnapConnectorComponent* Part);
 
-	[[nodiscard]] UPolySnapPieceComponent* GetHeldPiece() const { return HeldPiece.Get(); }
+	[[nodiscard]] UPolySnapConnectorComponent* GetHeldPart() const { return HeldPart.Get(); }
 
 private:
-	/** Registered pieces. Weak, because a piece may be destroyed without unregistering cleanly. */
-	TArray<TWeakObjectPtr<UPolySnapPieceComponent>> RegisteredPieces;
+	/** Registered parts. Weak, because a part may be destroyed without unregistering cleanly. */
+	TArray<TWeakObjectPtr<UPolySnapConnectorComponent>> RegisteredParts;
 
-	/** The piece currently carried by a builder component, if any. */
-	TWeakObjectPtr<UPolySnapPieceComponent> HeldPiece;
+	/** The part currently carried by a builder component, if any. */
+	TWeakObjectPtr<UPolySnapConnectorComponent> HeldPart;
 };

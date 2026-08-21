@@ -187,7 +187,7 @@ void FPolySnapGeometrySpec::Define()
 				});
 		});
 
-	Describe("the solved piece transform",
+	Describe("the solved part transform",
 		[this]()
 		{
 			It("puts the held socket exactly on the anchor",
@@ -197,7 +197,7 @@ void FPolySnapGeometrySpec::Define()
 					const FPolySnapSocketBasis Anchor = FPolySnapGeometry::BasisFromTransform(
 						FTransform(FRotator(5.0, 61.0, -14.0), FVector(300.0, -120.0, 45.0)));
 
-					const FTransform Solved = FPolySnapGeometry::SolvePieceTransform(HeldSocketLocal, Anchor,
+					const FTransform Solved = FPolySnapGeometry::SolvePartTransform(HeldSocketLocal, Anchor,
 						EPolySnapPolarity::Aligned, 138.19);
 					const FPolySnapSocketBasis Placed = FPolySnapGeometry::BasisFromTransform(HeldSocketLocal * Solved);
 
@@ -208,42 +208,42 @@ void FPolySnapGeometrySpec::Define()
 					TestEqual("dihedral", FPolySnapGeometry::DihedralDegrees(Anchor, Placed), 138.19, 1.0e-4);
 				});
 
-			It("leaves the piece unscaled",
+			It("leaves the part unscaled",
 				[this]()
 				{
-					const FTransform Solved = FPolySnapGeometry::SolvePieceTransform(PrimarySocketLocal(),
+					const FTransform Solved = FPolySnapGeometry::SolvePartTransform(PrimarySocketLocal(),
 						FPolySnapGeometry::BasisFromTransform(FTransform(FRotator(0.0, 45.0, 0.0))),
 						EPolySnapPolarity::Aligned, 90.0);
 
 					TestEqual("scale", Solved.GetScale3D(), FVector::OneVector, 1.0e-4f);
 				});
 
-			It("leaves the piece unscaled even when the held socket is scaled",
+			It("leaves the part unscaled even when the held socket is scaled",
 				[this]()
 				{
 					// The inverse of a socket scaled by s carries 1/s, and the desired pose is
-					// unit-scaled, so an unguarded solve hands the piece a scale of 1/s.
-					const FTransform Solved = FPolySnapGeometry::SolvePieceTransform(ScaledPrimarySocketLocal(3.0),
+					// unit-scaled, so an unguarded solve hands the part a scale of 1/s.
+					const FTransform Solved = FPolySnapGeometry::SolvePartTransform(ScaledPrimarySocketLocal(3.0),
 						FPolySnapGeometry::BasisFromTransform(FTransform(FRotator(0.0, 45.0, 0.0))),
 						EPolySnapPolarity::Aligned, 90.0);
 
 					TestEqual("scale", Solved.GetScale3D(), FVector::OneVector, 1.0e-4f);
 				});
 
-			It("places the piece identically whatever scale the held socket carries",
+			It("places the part identically whatever scale the held socket carries",
 				[this]()
 				{
 					// The load-bearing one. Scale on a socket must be inert, not merely divided
 					// back out of the scale channel: Inverse divides the translation by s as well,
 					// and s was never applied to the socket's own offset on the way in. A solver
-					// that only fixed the scale would still put the piece in the wrong place, and
-					// that shows up as a snap residual rather than as a visibly scaled piece.
+					// that only fixed the scale would still put the part in the wrong place, and
+					// that shows up as a snap residual rather than as a visibly scaled part.
 					const FPolySnapSocketBasis Anchor = FPolySnapGeometry::BasisFromTransform(
 						FTransform(FRotator(5.0, 61.0, -14.0), FVector(300.0, -120.0, 45.0)));
 
-					const FTransform Unscaled = FPolySnapGeometry::SolvePieceTransform(PrimarySocketLocal(), Anchor,
+					const FTransform Unscaled = FPolySnapGeometry::SolvePartTransform(PrimarySocketLocal(), Anchor,
 						EPolySnapPolarity::Aligned, 138.19);
-					const FTransform Scaled = FPolySnapGeometry::SolvePieceTransform(ScaledPrimarySocketLocal(2.5),
+					const FTransform Scaled = FPolySnapGeometry::SolvePartTransform(ScaledPrimarySocketLocal(2.5),
 						Anchor, EPolySnapPolarity::Aligned, 138.19);
 
 					TestEqual("location", Scaled.GetLocation(), Unscaled.GetLocation(), 1.0e-4f);
@@ -255,21 +255,21 @@ void FPolySnapGeometrySpec::Define()
 				[this]()
 				{
 					// SolveNearestPlacement reads the socket rotation out of a product with the
-					// piece transform, which is the other route a scale could take into the answer.
+					// part transform, which is the other route a scale could take into the answer.
 					const FPolySnapSocketBasis Anchor = FPolySnapGeometry::BasisFromTransform(
 						FTransform(FRotator(5.0, 61.0, -14.0), FVector(300.0, -120.0, 45.0)));
-					const FTransform CurrentPiece(FRotator(20.0, -70.0, 35.0), FVector(280.0, -90.0, 60.0));
+					const FTransform CurrentPart(FRotator(20.0, -70.0, 35.0), FVector(280.0, -90.0, 60.0));
 
 					EPolySnapPolarity UnscaledPolarity = EPolySnapPolarity::Aligned;
 					double UnscaledDihedral = 0.0;
 					double UnscaledRotation = 0.0;
-					FPolySnapGeometry::SolveNearestPlacement(PrimarySocketLocal(), CurrentPiece, Anchor,
+					FPolySnapGeometry::SolveNearestPlacement(PrimarySocketLocal(), CurrentPart, Anchor,
 						UnscaledPolarity, UnscaledDihedral, UnscaledRotation);
 
 					EPolySnapPolarity ScaledPolarity = EPolySnapPolarity::Aligned;
 					double ScaledDihedral = 0.0;
 					double ScaledRotation = 0.0;
-					FPolySnapGeometry::SolveNearestPlacement(ScaledPrimarySocketLocal(2.5), CurrentPiece, Anchor,
+					FPolySnapGeometry::SolveNearestPlacement(ScaledPrimarySocketLocal(2.5), CurrentPart, Anchor,
 						ScaledPolarity, ScaledDihedral, ScaledRotation);
 
 					TestTrue("polarity", ScaledPolarity == UnscaledPolarity);
@@ -283,7 +283,7 @@ void FPolySnapGeometrySpec::Define()
 					// The snapper's answer to CONVENTIONS.md section 7 check 4: given panel A at the
 					// origin, placing panel B coplanar must put it at (200, 0, 0) yawed 180 degrees.
 					const FPolySnapSocketBasis Anchor = FPolySnapGeometry::BasisFromTransform(PrimarySocketLocal());
-					const FTransform Solved = FPolySnapGeometry::SolvePieceTransform(PrimarySocketLocal(), Anchor,
+					const FTransform Solved = FPolySnapGeometry::SolvePartTransform(PrimarySocketLocal(), Anchor,
 						EPolySnapPolarity::Aligned, 180.0);
 
 					TestEqual("location", Solved.GetLocation(), FVector(2.0 * HalfPanelUu, 0.0, 0.0), 1.0e-4f);
@@ -294,15 +294,15 @@ void FPolySnapGeometrySpec::Define()
 	Describe("the least-rotation placement",
 		[this]()
 		{
-			It("picks the polarity nearer the orientation the piece is already in",
+			It("picks the polarity nearer the orientation the part is already in",
 				[this]()
 				{
 					const FTransform HeldSocketLocal = PrimarySocketLocal();
 					const FPolySnapSocketBasis Anchor = FPolySnapGeometry::BasisFromTransform(PrimarySocketLocal());
 
 					// Start from the pose an aligned coplanar seam would need, nudged slightly. The
-					// player turned the piece roughly this way, so the snap must commit to that reading.
-					const FTransform NearAligned = FPolySnapGeometry::SolvePieceTransform(HeldSocketLocal, Anchor,
+					// player turned the part roughly this way, so the snap must commit to that reading.
+					const FTransform NearAligned = FPolySnapGeometry::SolvePartTransform(HeldSocketLocal, Anchor,
 						EPolySnapPolarity::Aligned, 175.0);
 
 					EPolySnapPolarity Polarity = EPolySnapPolarity::Flipped;
@@ -316,13 +316,13 @@ void FPolySnapGeometrySpec::Define()
 					TestEqual("no rotation left to do", RequiredRotation, 0.0, 1.0e-3);
 				});
 
-			It("picks the flipped polarity when the piece is turned over",
+			It("picks the flipped polarity when the part is turned over",
 				[this]()
 				{
 					const FTransform HeldSocketLocal = PrimarySocketLocal();
 					const FPolySnapSocketBasis Anchor = FPolySnapGeometry::BasisFromTransform(PrimarySocketLocal());
 
-					const FTransform NearFlipped = FPolySnapGeometry::SolvePieceTransform(HeldSocketLocal, Anchor,
+					const FTransform NearFlipped = FPolySnapGeometry::SolvePartTransform(HeldSocketLocal, Anchor,
 						EPolySnapPolarity::Flipped, 200.0);
 
 					EPolySnapPolarity Polarity = EPolySnapPolarity::Aligned;

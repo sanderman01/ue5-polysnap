@@ -5,8 +5,8 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "PolySnapConnectorComponent.h"
 #include "PolySnapDebug.h"
-#include "PolySnapPieceComponent.h"
 #include "PolySnapSettings.h"
 
 UPolySnapSubsystem* UPolySnapSubsystem::Get(const UObject* WorldContextObject)
@@ -23,27 +23,27 @@ TStatId UPolySnapSubsystem::GetStatId() const
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UPolySnapSubsystem, STATGROUP_Tickables);
 }
 
-void UPolySnapSubsystem::RegisterPiece(UPolySnapPieceComponent* Piece)
+void UPolySnapSubsystem::RegisterPart(UPolySnapConnectorComponent* Part)
 {
-	if (Piece != nullptr)
+	if (Part != nullptr)
 	{
-		RegisteredPieces.AddUnique(Piece);
+		RegisteredParts.AddUnique(Part);
 	}
 }
 
-void UPolySnapSubsystem::UnregisterPiece(UPolySnapPieceComponent* Piece)
+void UPolySnapSubsystem::UnregisterPart(UPolySnapConnectorComponent* Part)
 {
-	RegisteredPieces.Remove(Piece);
+	RegisteredParts.Remove(Part);
 
-	if (HeldPiece.Get() == Piece)
+	if (HeldPart.Get() == Part)
 	{
-		HeldPiece.Reset();
+		HeldPart.Reset();
 	}
 }
 
-void UPolySnapSubsystem::SetHeldPiece(UPolySnapPieceComponent* Piece)
+void UPolySnapSubsystem::SetHeldPart(UPolySnapConnectorComponent* Part)
 {
-	HeldPiece = Piece;
+	HeldPart = Part;
 }
 
 FPolySnapQueryTolerances UPolySnapSubsystem::GetQueryTolerances()
@@ -57,27 +57,27 @@ FPolySnapQueryTolerances UPolySnapSubsystem::GetQueryTolerances()
 	return Tolerances;
 }
 
-void UPolySnapSubsystem::GatherWorldSockets(const UPolySnapPieceComponent* ExcludePiece, const FVector& Origin,
+void UPolySnapSubsystem::GatherWorldSockets(const UPolySnapConnectorComponent* ExcludePart, const FVector& Origin,
 	double SearchRadiusUu, TArray<FPolySnapWorldSocket>& OutSockets) const
 {
 	const double RadiusSquared = SearchRadiusUu * SearchRadiusUu;
 
-	for (const TWeakObjectPtr<UPolySnapPieceComponent>& WeakPiece : RegisteredPieces)
+	for (const TWeakObjectPtr<UPolySnapConnectorComponent>& WeakPart : RegisteredParts)
 	{
-		const UPolySnapPieceComponent* Piece = WeakPiece.Get();
-		if (Piece == nullptr || Piece == ExcludePiece)
+		const UPolySnapConnectorComponent* Part = WeakPart.Get();
+		if (Part == nullptr || Part == ExcludePart)
 		{
 			continue;
 		}
 
-		// Broad phase on the piece, so a level full of panels does not cost a socket-pair test
+		// Broad phase on the part, so a level full of panels does not cost a socket-pair test
 		// each. The real proximity test is per pair and much tighter.
-		if (FVector::DistSquared(Piece->GetPieceTransform().GetLocation(), Origin) > RadiusSquared)
+		if (FVector::DistSquared(Part->GetPartTransform().GetLocation(), Origin) > RadiusSquared)
 		{
 			continue;
 		}
 
-		Piece->AppendWorldSockets(OutSockets);
+		Part->AppendWorldSockets(OutSockets);
 	}
 }
 
@@ -86,21 +86,21 @@ void UPolySnapSubsystem::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 #if ENABLE_DRAW_DEBUG
-	// Mode 2 draws every registered piece. Mode 1 leaves the drawing to the builder component,
-	// which knows which piece is held and which pair is a candidate.
+	// Mode 2 draws every registered part. Mode 1 leaves the drawing to the builder component,
+	// which knows which part is held and which pair is a candidate.
 	if (FPolySnapDebug::GetDrawMode() < 2)
 	{
 		return;
 	}
 
 	const UWorld* World = GetWorld();
-	const UPolySnapPieceComponent* Held = HeldPiece.Get();
+	const UPolySnapConnectorComponent* Held = HeldPart.Get();
 
-	for (const TWeakObjectPtr<UPolySnapPieceComponent>& WeakPiece : RegisteredPieces)
+	for (const TWeakObjectPtr<UPolySnapConnectorComponent>& WeakPart : RegisteredParts)
 	{
-		if (const UPolySnapPieceComponent* Piece = WeakPiece.Get())
+		if (const UPolySnapConnectorComponent* Part = WeakPart.Get())
 		{
-			FPolySnapDebug::DrawPiece(World, *Piece, Piece == Held);
+			FPolySnapDebug::DrawPart(World, *Part, Part == Held);
 		}
 	}
 #endif

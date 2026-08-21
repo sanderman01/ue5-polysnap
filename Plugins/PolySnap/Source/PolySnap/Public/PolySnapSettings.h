@@ -9,7 +9,7 @@
 #include "PolySnapSettings.generated.h"
 
 /** Fired whenever a PolySnap setting changes at runtime, from the settings panel or from
- *  PolySnap.SetDamping. It exists so a live piece can re-apply a value that is otherwise only read
+ *  PolySnap.SetDamping. It exists so a live part can re-apply a value that is otherwise only read
  *  once, at BeginPlay. */
 DECLARE_MULTICAST_DELEGATE(FPolySnapSettingsChanged);
 
@@ -21,7 +21,7 @@ DECLARE_MULTICAST_DELEGATE(FPolySnapSettingsChanged);
  * the validator switches in particular.
  *
  * DESIGN section 7 lists tolerances as an open question -- whether they are global, per socket
- * type, or scaled by piece size is unexplored. Everything here is global, which is the simplest
+ * type, or scaled by part size is unexplored. Everything here is global, which is the simplest
  * thing that can work and the thing to revisit first.
  */
 UCLASS(config = PolySnap, defaultconfig, meta = (DisplayName = "PolySnap"))
@@ -51,11 +51,11 @@ public:
 	// -- Conventions, CONVENTIONS.md section 2 ----------------------------------------------
 
 	/**
-	 * Which socket-local axis carries which role, for every piece that does not override it.
+	 * Which socket-local axis carries which role, for every part that does not override it.
 	 *
 	 * The default is CONVENTIONS.md section 2's table, which is what the Blender pipeline in
 	 * sections 3 to 5 produces. Set this to whichever pipeline the project's assets mostly come
-	 * from: the import validator has no piece component to ask and checks against this alone.
+	 * from: the import validator has no part component to ask and checks against this alone.
 	 */
 	UPROPERTY(config, EditAnywhere, Category = "Conventions")
 	FPolySnapSocketAxes DefaultSocketAxes;
@@ -74,11 +74,11 @@ public:
 		meta = (ClampMin = "0.1", ClampMax = "89.0", ForceUnits = "deg"))
 	float TangentAngleToleranceDegrees = 20.0f;
 
-	/** How far in front of the camera a held piece is carried, before the player pushes or pulls it. */
+	/** How far in front of the camera a held part is carried, before the player pushes or pulls it. */
 	UPROPERTY(config, EditAnywhere, Category = "Building", meta = (ClampMin = "10.0", ForceUnits = "cm"))
 	float DefaultHoldDistanceUu = 250.0f;
 
-	/** Limits on how far the player may push or pull a held piece. */
+	/** Limits on how far the player may push or pull a held part. */
 	UPROPERTY(config, EditAnywhere, Category = "Building", meta = (ClampMin = "10.0", ForceUnits = "cm"))
 	float MinHoldDistanceUu = 100.0f;
 
@@ -89,12 +89,12 @@ public:
 	UPROPERTY(config, EditAnywhere, Category = "Building", meta = (ClampMin = "10.0", ForceUnits = "cm"))
 	float GrabReachUu = 600.0f;
 
-	/** How much one push-or-pull input step moves the held piece. */
+	/** How much one push-or-pull input step moves the held part. */
 	UPROPERTY(config, EditAnywhere, Category = "Building", meta = (ClampMin = "1.0", ForceUnits = "cm"))
 	float HoldDistanceStepUu = 25.0f;
 
 	/**
-	 * How fast holding a roll key turns the held piece about the view axis.
+	 * How fast holding a roll key turns the held part about the view axis.
 	 *
 	 * A rate rather than a per-press step: the roll keys are held down, so the input fires every
 	 * frame and only a rate multiplied by delta time is both smooth and framerate independent.
@@ -105,7 +105,7 @@ public:
 	// -- Physics ----------------------------------------------------------------------------
 
 	/**
-	 * Damping applied to a released piece. Gravity is zero in this game, so without damping a
+	 * Damping applied to a released part. Gravity is zero in this game, so without damping a
 	 * nudged panel drifts out of the level and never comes back.
 	 *
 	 * Angular wants to be the higher of the two: a spinning panel is more disorienting than a
@@ -114,45 +114,45 @@ public:
 	 * quickly -- at that point the thing to tune is joint stiffness, not this.
 	 */
 	UPROPERTY(config, EditAnywhere, Category = "Physics", meta = (ClampMin = "0.0"))
-	float PieceLinearDamping = 5.0f;
+	float PartLinearDamping = 5.0f;
 
 	UPROPERTY(config, EditAnywhere, Category = "Physics", meta = (ClampMin = "0.0"))
-	float PieceAngularDamping = 8.0f;
+	float PartAngularDamping = 8.0f;
 
 	/**
-	 * Whether a settled piece may fall asleep sooner than the engine's default threshold.
+	 * Whether a settled part may fall asleep sooner than the engine's default threshold.
 	 *
-	 * Damping approaches zero velocity asymptotically and never arrives, so a piece keeps
+	 * Damping approaches zero velocity asymptotically and never arrives, so a part keeps
 	 * crawling long after it looks stopped. Sleep is what actually ends the motion, and a
 	 * sleeping island costs the solver nothing as assemblies grow.
 	 */
 	UPROPERTY(config, EditAnywhere, Category = "Physics")
-	bool bUsePieceSleepThreshold = true;
+	bool bUsePartSleepThreshold = true;
 
 	/**
-	 * Multiplies the linear and angular velocities below which a piece counts as at rest, so a
+	 * Multiplies the linear and angular velocities below which a part counts as at rest, so a
 	 * higher value sleeps sooner. The velocities themselves come from the body's physical
 	 * material, or from Chaos's defaults where it has none.
 	 */
 	UPROPERTY(config, EditAnywhere, Category = "Physics",
-		meta = (ClampMin = "0.1", EditCondition = "bUsePieceSleepThreshold"))
-	float PieceSleepThresholdMultiplier = 5.0f;
+		meta = (ClampMin = "0.1", EditCondition = "bUsePartSleepThreshold"))
+	float PartSleepThresholdMultiplier = 5.0f;
 
 	// -- Validation, CONVENTIONS.md section 6 -----------------------------------------------
 
-	/** Outward pointing into the piece -- a 180 degree slip, or swapped Outward and Tangent roles. */
+	/** Outward pointing into the part -- a 180 degree slip, or swapped Outward and Tangent roles. */
 	UPROPERTY(config, EditAnywhere, Category = "Validation")
 	bool bWarnOnInwardOutward = true;
 
-	/** On a planar piece, a socket Normal not parallel to the piece's local +Z: authored standing, or stray roll. */
+	/** On a planar part, a socket Normal not parallel to the part's local +Z: authored standing, or stray roll. */
 	UPROPERTY(config, EditAnywhere, Category = "Validation")
-	bool bWarnOnNonCanonicalPieceFrame = true;
+	bool bWarnOnNonCanonicalPartFrame = true;
 
-	/** On a planar piece, a socket off the mid-plane -- the origin-on-a-face flip-displacement trap. */
+	/** On a planar part, a socket off the mid-plane -- the origin-on-a-face flip-displacement trap. */
 	UPROPERTY(config, EditAnywhere, Category = "Validation")
 	bool bWarnOnSocketOffMidPlane = true;
 
-	/** Socket 001's Outward not parallel to the piece's local +X. House style, not a requirement. */
+	/** Socket 001's Outward not parallel to the part's local +X. House style, not a requirement. */
 	UPROPERTY(config, EditAnywhere, Category = "Validation")
 	bool bWarnOnUnalignedPrimarySocket = true;
 
@@ -166,8 +166,8 @@ public:
 	float AxisAlignmentToleranceDegrees = 1.0f;
 
 	/**
-	 * A piece counts as planar when its smallest bounding extent is at most this fraction of its
-	 * largest. Three of the warnings above are scoped to planar pieces, because the convention
+	 * A part counts as planar when its smallest bounding extent is at most this fraction of its
+	 * largest. Three of the warnings above are scoped to planar parts, because the convention
 	 * they check is itself about flat panels.
 	 */
 	UPROPERTY(config, EditAnywhere, Category = "Validation", meta = (ClampMin = "0.01", ClampMax = "1.0"))

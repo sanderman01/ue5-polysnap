@@ -1,6 +1,6 @@
 // Copyright (c) 2026, Alexander Verbeek. All rights reserved.
 
-#include "PolySnapPieceComponent.h"
+#include "PolySnapConnectorComponent.h"
 
 #include "Components/MeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -15,12 +15,12 @@
 #include "PolySnapSocketName.h"
 #include "PolySnapSubsystem.h"
 
-UPolySnapPieceComponent::UPolySnapPieceComponent()
+UPolySnapConnectorComponent::UPolySnapConnectorComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UPolySnapPieceComponent::BeginPlay()
+void UPolySnapConnectorComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -28,23 +28,23 @@ void UPolySnapPieceComponent::BeginPlay()
 
 	if (const AActor* Owner = GetOwner())
 	{
-		// DESIGN section 2.2: a placed piece is never scaled. A panel scaled 1.5x has 3000 mm
+		// DESIGN section 2.2: a placed part is never scaled. A panel scaled 1.5x has 3000 mm
 		// edges while its descriptors still read 2000, so it snaps to things it cannot meet --
 		// and no import-time validator can catch it, because the scale lives on the instance.
 		ensureMsgf(Owner->GetActorScale3D().Equals(FVector::OneVector),
-			TEXT("PolySnap piece '%s' is scaled %s. Pieces must be placed at scale 1; its sockets now "
+			TEXT("PolySnap part '%s' is scaled %s. Parts must be placed at scale 1; its sockets now "
 				 "lie about their edge lengths."),
 				*Owner->GetName(), *Owner->GetActorScale3D().ToString());
 	}
 
 	if (UPolySnapSubsystem* Subsystem = UPolySnapSubsystem::Get(this))
 	{
-		Subsystem->RegisterPiece(this);
+		Subsystem->RegisterPart(this);
 	}
 
 	// The only physics decision this component makes for itself. Whether the body simulates at all,
 	// its collision and its mass belong to whoever authored the actor (DESIGN section 2.11) -- an
-	// anchored piece is the single case where PolySnap overrules them, because it is the fixed
+	// anchored part is the single case where PolySnap overrules them, because it is the fixed
 	// reference the rest of the structure is built against.
 	if (bStartAnchored && ResolvedSocketMesh != nullptr)
 	{
@@ -60,7 +60,7 @@ void UPolySnapPieceComponent::BeginPlay()
 		UPolySnapSettings::OnSettingsChanged().AddWeakLambda(this, [this]() { ApplyPhysicsSettings(); });
 }
 
-void UPolySnapPieceComponent::ApplyPhysicsSettings()
+void UPolySnapConnectorComponent::ApplyPhysicsSettings()
 {
 	UMeshComponent* Mesh = ResolvedSocketMesh;
 	if (Mesh == nullptr)
@@ -69,8 +69,8 @@ void UPolySnapPieceComponent::ApplyPhysicsSettings()
 	}
 
 	const UPolySnapSettings& Settings = UPolySnapSettings::Get();
-	Mesh->SetLinearDamping(Settings.PieceLinearDamping);
-	Mesh->SetAngularDamping(Settings.PieceAngularDamping);
+	Mesh->SetLinearDamping(Settings.PartLinearDamping);
+	Mesh->SetAngularDamping(Settings.PartAngularDamping);
 
 	FBodyInstance* Body = Mesh->GetBodyInstance();
 	if (Body == nullptr)
@@ -79,16 +79,16 @@ void UPolySnapPieceComponent::ApplyPhysicsSettings()
 	}
 
 	// Damping is exponential decay: it approaches zero velocity and never arrives, so a released
-	// piece keeps crawling long after it looks stopped. What ends the motion is Chaos deciding the
-	// piece's island is asleep, which it does once every body in it has stayed under a linear and
+	// part keeps crawling long after it looks stopped. What ends the motion is Chaos deciding the
+	// part's island is asleep, which it does once every body in it has stayed under a linear and
 	// an angular velocity threshold for a run of ticks. Custom scales both thresholds by the
-	// multiplier below -- higher means a faster-moving piece already counts as at rest, so it
+	// multiplier below -- higher means a faster-moving part already counts as at rest, so it
 	// sleeps sooner -- and a sleeping island is no longer solved at all, which is what keeps a
 	// large structure cheap.
-	Body->SleepFamily = Settings.bUsePieceSleepThreshold ? ESleepFamily::Custom : ESleepFamily::Normal;
-	Body->CustomSleepThresholdMultiplier = Settings.PieceSleepThresholdMultiplier;
+	Body->SleepFamily = Settings.bUsePartSleepThreshold ? ESleepFamily::Custom : ESleepFamily::Normal;
+	Body->CustomSleepThresholdMultiplier = Settings.PartSleepThresholdMultiplier;
 
-	// FBodyInstance only reads those two when it creates the physics body, so a live piece needs
+	// FBodyInstance only reads those two when it creates the physics body, so a live part needs
 	// the value pushed onto its particle by hand. A no-op on a body that does not exist yet, which
 	// is fine: that body will read the fields set above when it is created.
 	FPhysicsCommand::ExecuteWrite(Body->GetPhysicsActor(),
@@ -96,7 +96,7 @@ void UPolySnapPieceComponent::ApplyPhysicsSettings()
 		{ FPhysicsInterface::SetSleepThresholdMultiplier_AssumesLocked(Actor, Multiplier); });
 }
 
-void UPolySnapPieceComponent::SetSimulating(bool bSimulate)
+void UPolySnapConnectorComponent::SetSimulating(bool bSimulate)
 {
 	UMeshComponent* Mesh = ResolvedSocketMesh;
 	if (Mesh == nullptr)
@@ -104,7 +104,7 @@ void UPolySnapPieceComponent::SetSimulating(bool bSimulate)
 		return;
 	}
 
-	// An anchored piece never simulates, whatever anyone asks for.
+	// An anchored part never simulates, whatever anyone asks for.
 	Mesh->SetSimulatePhysics(bSimulate && !bStartAnchored);
 
 	if (!bSimulate || !Mesh->IsSimulatingPhysics())
@@ -116,29 +116,29 @@ void UPolySnapPieceComponent::SetSimulating(bool bSimulate)
 	// dynamic, so the settings are re-applied at the one moment they matter.
 	ApplyPhysicsSettings();
 
-	// A carried piece is kinematic and is teleported to the solved transform every frame, so the
+	// A carried part is kinematic and is teleported to the solved transform every frame, so the
 	// solver has been deriving a velocity from the player's own movement. Handing the body back to
-	// the simulation still carrying it is what sends a just-placed piece wandering off: the player
+	// the simulation still carrying it is what sends a just-placed part wandering off: the player
 	// put it there, so it starts at rest and damping has nothing to bleed off.
 	Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
 	Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
 }
 
-void UPolySnapPieceComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void UPolySnapConnectorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UPolySnapSettings::OnSettingsChanged().Remove(SettingsChangedHandle);
 	SettingsChangedHandle.Reset();
 
 	if (UPolySnapSubsystem* Subsystem = UPolySnapSubsystem::Get(this))
 	{
-		Subsystem->UnregisterPiece(this);
+		Subsystem->UnregisterPart(this);
 	}
 
 	Super::EndPlay(EndPlayReason);
 }
 
 #if WITH_EDITOR
-void UPolySnapPieceComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+void UPolySnapConnectorComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 
@@ -148,12 +148,12 @@ void UPolySnapPieceComponent::PostEditChangeProperty(FPropertyChangedEvent& Prop
 }
 #endif
 
-FPolySnapSocketAxes UPolySnapPieceComponent::GetEffectiveSocketAxes() const
+FPolySnapSocketAxes UPolySnapConnectorComponent::GetEffectiveSocketAxes() const
 {
 	return bOverrideSocketAxes ? SocketAxes : UPolySnapSettings::Get().DefaultSocketAxes;
 }
 
-void UPolySnapPieceComponent::RebuildSocketCache()
+void UPolySnapConnectorComponent::RebuildSocketCache()
 {
 	SocketDescriptors.Reset();
 	ResolvedSocketMesh = SocketMesh;
@@ -162,10 +162,10 @@ void UPolySnapPieceComponent::RebuildSocketCache()
 	FString AxesError;
 	if (!EffectiveAxes.Validate(&AxesError))
 	{
-		// Loud, and then carry on with the default. A piece that refused to snap at all would be
+		// Loud, and then carry on with the default. A part that refused to snap at all would be
 		// a worse diagnostic than one that snaps to the convention the rest of the project uses.
 		UE_LOG(LogPolySnap, Error,
-			TEXT("PolySnap piece on '%s' has an impossible socket axis convention. %s"), *GetNameSafe(GetOwner()),
+			TEXT("PolySnap part on '%s' has an impossible socket axis convention. %s"), *GetNameSafe(GetOwner()),
 				*AxesError);
 
 		EffectiveAxes = FPolySnapSocketAxes();
@@ -184,7 +184,7 @@ void UPolySnapPieceComponent::RebuildSocketCache()
 	if (ResolvedSocketMesh == nullptr)
 	{
 		UE_LOG(LogPolySnap, Warning,
-			TEXT("PolySnap piece on '%s' has no mesh component; it owns no sockets."), *GetNameSafe(GetOwner()));
+			TEXT("PolySnap part on '%s' has no mesh component; it owns no sockets."), *GetNameSafe(GetOwner()));
 		return;
 	}
 
@@ -214,7 +214,7 @@ void UPolySnapPieceComponent::RebuildSocketCache()
 				{
 					UE_LOG(LogPolySnap, Error,
 						TEXT("Duplicate socket ID %03d on '%s': '%s' and '%s'. IDs are permanent identity "
-							 "and must be unique within a piece."),
+							 "and must be unique within a part."),
 							Descriptor.Id, *GetNameSafe(GetOwner()), *Existing->ToString(), *SocketName.ToString());
 				}
 				else
@@ -227,10 +227,10 @@ void UPolySnapPieceComponent::RebuildSocketCache()
 	}
 
 	UE_LOG(LogPolySnap, Verbose,
-		TEXT("PolySnap piece '%s' cached %d edge socket(s)."), *GetNameSafe(GetOwner()), SocketDescriptors.Num());
+		TEXT("PolySnap part '%s' cached %d edge socket(s)."), *GetNameSafe(GetOwner()), SocketDescriptors.Num());
 }
 
-FTransform UPolySnapPieceComponent::GetSocketWorldTransform(FName SocketName) const
+FTransform UPolySnapConnectorComponent::GetSocketWorldTransform(FName SocketName) const
 {
 	if (ResolvedSocketMesh == nullptr)
 	{
@@ -241,33 +241,33 @@ FTransform UPolySnapPieceComponent::GetSocketWorldTransform(FName SocketName) co
 		SocketAxisCorrection);
 }
 
-FTransform UPolySnapPieceComponent::GetPieceTransform() const
+FTransform UPolySnapConnectorComponent::GetPartTransform() const
 {
 	const AActor* Owner = GetOwner();
 	return Owner != nullptr ? Owner->GetActorTransform() : FTransform::Identity;
 }
 
-void UPolySnapPieceComponent::AppendWorldSockets(TArray<FPolySnapWorldSocket>& OutSockets) const
+void UPolySnapConnectorComponent::AppendWorldSockets(TArray<FPolySnapWorldSocket>& OutSockets) const
 {
 	OutSockets.Reserve(OutSockets.Num() + SocketDescriptors.Num());
 
 	for (const FPolySnapSocketDescriptor& Descriptor : SocketDescriptors)
 	{
 		FPolySnapWorldSocket& WorldSocket = OutSockets.AddDefaulted_GetRef();
-		WorldSocket.Piece = const_cast<UPolySnapPieceComponent*>(this);
+		WorldSocket.Part = const_cast<UPolySnapConnectorComponent*>(this);
 		WorldSocket.Descriptor = Descriptor;
 		WorldSocket.WorldTransform = GetSocketWorldTransform(Descriptor.SocketName);
 		WorldSocket.bConnected = IsSocketConnected(Descriptor.Id);
 	}
 }
 
-bool UPolySnapPieceComponent::IsConnectedTo(const UPolySnapPieceComponent* Other, int32 OtherSocketId,
+bool UPolySnapConnectorComponent::IsConnectedTo(const UPolySnapConnectorComponent* Other, int32 OtherSocketId,
 	int32 LocalSocketId) const
 {
 	for (const FPolySnapConnection& Connection : Connections)
 	{
 		if (Connection.LocalSocketId == LocalSocketId && Connection.OtherSocketId == OtherSocketId
-			&& Connection.OtherPiece.Get() == Other)
+			&& Connection.OtherPart.Get() == Other)
 		{
 			return true;
 		}
@@ -276,7 +276,7 @@ bool UPolySnapPieceComponent::IsConnectedTo(const UPolySnapPieceComponent* Other
 	return false;
 }
 
-bool UPolySnapPieceComponent::IsSocketConnected(int32 LocalSocketId) const
+bool UPolySnapConnectorComponent::IsSocketConnected(int32 LocalSocketId) const
 {
 	for (const FPolySnapConnection& Connection : Connections)
 	{
@@ -289,12 +289,12 @@ bool UPolySnapPieceComponent::IsSocketConnected(int32 LocalSocketId) const
 	return false;
 }
 
-void UPolySnapPieceComponent::AddConnection(const FPolySnapConnection& Connection)
+void UPolySnapConnectorComponent::AddConnection(const FPolySnapConnection& Connection)
 {
 	Connections.Add(Connection);
 }
 
-const FPolySnapSocketDescriptor* UPolySnapPieceComponent::FindDescriptorById(int32 SocketId) const
+const FPolySnapSocketDescriptor* UPolySnapConnectorComponent::FindDescriptorById(int32 SocketId) const
 {
 	return SocketDescriptors.FindByPredicate(
 		[SocketId](const FPolySnapSocketDescriptor& Descriptor) { return Descriptor.Id == SocketId; });

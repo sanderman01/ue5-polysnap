@@ -6,7 +6,7 @@ namespace PolySnapGeometryPrivate
 {
 /**
 	 * Below this, a quaternion carries no usable twist about the axis and the decomposition is
-	 * ambiguous. Falling back to zero is harmless: it only means the piece is not already near
+	 * ambiguous. Falling back to zero is harmless: it only means the part is not already near
 	 * any particular fold, so any dihedral is equally far away.
 	 */
 constexpr double TwistEpsilon = UE_DOUBLE_SMALL_NUMBER;
@@ -160,21 +160,21 @@ FPolySnapSocketBasis FPolySnapGeometry::MatedBasis(const FPolySnapSocketBasis& A
 	return Mated;
 }
 
-FTransform FPolySnapGeometry::SolvePieceTransform(const FTransform& HeldSocketLocal, const FPolySnapSocketBasis& Anchor,
+FTransform FPolySnapGeometry::SolvePartTransform(const FTransform& HeldSocketLocal, const FPolySnapSocketBasis& Anchor,
 	EPolySnapPolarity Polarity, double InDihedralDegrees)
 {
 	const FTransform DesiredSocketWorld = TransformFromBasis(MatedBasis(Anchor, Polarity, InDihedralDegrees));
 
-	// SocketWorld == SocketLocal * PieceWorld, so the piece transform is what remains once the
+	// SocketWorld == SocketLocal * PartWorld, so the part transform is what remains once the
 	// socket's own offset is divided out. FTransform composes left to right: A * B applies A
 	// first, which is the opposite order to FQuat.
 	//
 	// Scale is dropped before inverting, not after. DesiredSocketWorld is unit-scaled by
-	// construction, so inverting a socket scaled by s would leave the piece scaled by 1/s AND
+	// construction, so inverting a socket scaled by s would leave the part scaled by 1/s AND
 	// displaced, because Inverse divides the translation by s as well -- an offset that s was
 	// never applied to on the way in. Canonicalise already strips scale on the runtime path;
 	// this repeats it because a caller building HeldSocketLocal from GetRelativeTransform can
-	// reintroduce scale from the piece side without passing through Canonicalise at all.
+	// reintroduce scale from the part side without passing through Canonicalise at all.
 	return WithoutScale(HeldSocketLocal).Inverse() * DesiredSocketWorld;
 }
 
@@ -185,21 +185,21 @@ double FPolySnapGeometry::AngleBetweenDegrees(const FQuat& A, const FQuat& B)
 }
 
 double FPolySnapGeometry::NearestDihedralDegrees(const FTransform& HeldSocketLocal,
-	const FTransform& CurrentPieceTransform, const FPolySnapSocketBasis& Anchor, EPolySnapPolarity Polarity,
+	const FTransform& CurrentPartTransform, const FPolySnapSocketBasis& Anchor, EPolySnapPolarity Polarity,
 	double& OutRequiredRotationDegrees)
 {
 	using namespace PolySnapGeometryPrivate;
 
-	// (HeldSocketLocal * CurrentPieceTransform).GetRotation(), composed directly. FTransform's
+	// (HeldSocketLocal * CurrentPartTransform).GetRotation(), composed directly. FTransform's
 	// multiply sets Out.Rotation = B.Rotation * A.Rotation, so this is the same quaternion for an
 	// unscaled pair and an exact one for any other: a non-uniform scale pushes FTransform onto its
 	// matrix path, whose extracted rotation is a shear-contaminated approximation.
-	const FQuat CurrentSocketRotation = CurrentPieceTransform.GetRotation() * HeldSocketLocal.GetRotation();
+	const FQuat CurrentSocketRotation = CurrentPartTransform.GetRotation() * HeldSocketLocal.GetRotation();
 	const FQuat BaseRotation = TransformFromBasis(MatedBasis(Anchor, Polarity, 0.0)).GetRotation();
 
 	// The admissible poses are BaseRotation followed by a rotation about the world axis
 	// Anchor.Tangent, so the family is a left-multiplication: R(theta) = Swing(theta) * Base.
-	// The theta closest to where the piece already is, is therefore the twist of the relative
+	// The theta closest to where the part already is, is therefore the twist of the relative
 	// rotation about that axis. FQuat composes right to left: C = A * B applies B first.
 	FQuat Relative = CurrentSocketRotation * BaseRotation.Inverse();
 	Relative.Normalize();
@@ -219,21 +219,21 @@ double FPolySnapGeometry::NearestDihedralDegrees(const FTransform& HeldSocketLoc
 	return Dihedral;
 }
 
-void FPolySnapGeometry::SolveNearestPlacement(const FTransform& HeldSocketLocal,
-	const FTransform& CurrentPieceTransform, const FPolySnapSocketBasis& Anchor, EPolySnapPolarity& OutPolarity,
-	double& OutDihedralDegrees, double& OutRequiredRotationDegrees)
+void FPolySnapGeometry::SolveNearestPlacement(const FTransform& HeldSocketLocal, const FTransform& CurrentPartTransform,
+	const FPolySnapSocketBasis& Anchor, EPolySnapPolarity& OutPolarity, double& OutDihedralDegrees,
+	double& OutRequiredRotationDegrees)
 {
 	double AlignedRotation = 0.0;
-	const double AlignedDihedral = NearestDihedralDegrees(HeldSocketLocal, CurrentPieceTransform, Anchor,
+	const double AlignedDihedral = NearestDihedralDegrees(HeldSocketLocal, CurrentPartTransform, Anchor,
 		EPolySnapPolarity::Aligned, AlignedRotation);
 
 	double FlippedRotation = 0.0;
-	const double FlippedDihedral = NearestDihedralDegrees(HeldSocketLocal, CurrentPieceTransform, Anchor,
+	const double FlippedDihedral = NearestDihedralDegrees(HeldSocketLocal, CurrentPartTransform, Anchor,
 		EPolySnapPolarity::Flipped, FlippedRotation);
 
 	// Both polarities are always admissible -- a flip is a proper 180 degree rotation the player
 	// could perform by hand, not a mirror image -- so the choice is settled by which costs less
-	// rotation from where the piece already is. That is the whole of the flip decision.
+	// rotation from where the part already is. That is the whole of the flip decision.
 	if (FlippedRotation < AlignedRotation)
 	{
 		OutPolarity = EPolySnapPolarity::Flipped;

@@ -17,7 +17,7 @@ static constexpr double HalfPanelUu = 100.0;
 static constexpr const TCHAR* PanelThickness = TEXT("40");
 
 /**
- * A world socket with no piece behind it, which is all the pure query needs.
+ * A world socket with no part behind it, which is all the pure query needs.
  *
  * The size fields are tokens rather than numbers, so they are spelled as text here; these ones
  * happen to read as millimetres because the calibration panel does, but the query never knows
@@ -40,9 +40,9 @@ static FPolySnapWorldSocket MakeSocket(int32 Id, const TCHAR* Length, const FTra
 }
 
 /** The socket on the +X edge of a panel at the given transform. */
-static FTransform PrimarySocketAt(const FTransform& PieceTransform)
+static FTransform PrimarySocketAt(const FTransform& PartTransform)
 {
-	return FTransform(FRotator::ZeroRotator, FVector(HalfPanelUu, 0.0, 0.0)) * PieceTransform;
+	return FTransform(FRotator::ZeroRotator, FVector(HalfPanelUu, 0.0, 0.0)) * PartTransform;
 }
 
 static FString RejectionName(EPolySnapRejection Rejection)
@@ -129,7 +129,7 @@ void FPolySnapSnapQuerySpec::Define()
 						RejectionName(FPolySnapSnapQuery::TestPair(Held, Aligned, Tolerances, AlignedCandidate)),
 						RejectionName(EPolySnapRejection::None));
 
-					// Same tangent: the piece is turned over, which is a motion the player can perform.
+					// Same tangent: the part is turned over, which is a motion the player can perform.
 					const FPolySnapWorldSocket Flipped =
 						MakeSocket(1, TEXT("2000"), FTransform(FRotator(0.0, 0.0, 180.0)));
 					FPolySnapCandidate FlippedCandidate;
@@ -191,7 +191,7 @@ void FPolySnapSnapQuerySpec::Define()
 
 					const FTransform HeldSocketLocal = Candidate.HeldSocket.WorldTransform.GetRelativeTransform(PanelB);
 					const FPolySnapSocketBasis Placed =
-						FPolySnapGeometry::BasisFromTransform(HeldSocketLocal * Candidate.SolvedPieceTransform);
+						FPolySnapGeometry::BasisFromTransform(HeldSocketLocal * Candidate.SolvedPartTransform);
 					const FPolySnapSocketBasis Anchor =
 						FPolySnapGeometry::BasisFromTransform(Candidate.TargetSocket.WorldTransform);
 
@@ -204,7 +204,7 @@ void FPolySnapSnapQuerySpec::Define()
 				{
 					// MakeSocket builds WorldTransform directly, so this never passes through
 					// Canonicalise -- which is the point. It is an independent check that the
-					// solver itself is immune, for the case where scale re-enters from the piece
+					// solver itself is immune, for the case where scale re-enters from the part
 					// side of GetRelativeTransform rather than off the mesh.
 					const FTransform PanelA = FTransform::Identity;
 					const FTransform PanelB(FRotator(0.0, 178.0, 0.0), FVector(2.0 * HalfPanelUu + 4.0, 2.0, 0.0));
@@ -227,9 +227,8 @@ void FPolySnapSnapQuerySpec::Define()
 						FPolySnapSnapQuery::FindBest(ScaledHeld, ScaledTargets, PanelB, Tolerances);
 
 					TestTrue("found a candidate", WithScale.IsSet());
-					TestTrue("same placement",
-						WithScale.SolvedPieceTransform.Equals(Plain.SolvedPieceTransform, 1.0e-4));
-					TestEqual("piece is unscaled", WithScale.SolvedPieceTransform.GetScale3D(), FVector::OneVector,
+					TestTrue("same placement", WithScale.SolvedPartTransform.Equals(Plain.SolvedPartTransform, 1.0e-4));
+					TestEqual("part is unscaled", WithScale.SolvedPartTransform.GetScale3D(), FVector::OneVector,
 						1.0e-4f);
 				});
 
