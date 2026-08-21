@@ -346,13 +346,38 @@ The anchor pins five of six degrees of freedom, leaving θ. θ and polarity are 
    axis. For a candidate target the θ bringing the two closest is closed form: decompose the
    target's offset from the anchor into components along and across the axis, then rotate the held
    socket's across-axis component onto the target's. One `atan2`, no iteration. The along-axis
-   component does not rotate — **that leftover is the residual.** Search both polarities, take the
-   smallest, and if it is in tolerance its θ and polarity are the placement.
+   component does not rotate — **that leftover is the residual.** Search both polarities and every
+   secondary pair; every θ whose residual is inside the adoption tolerance is admissible, and
+   **the one requiring least rotation from the part's current pose wins**, the residual breaking
+   ties rather than deciding.
 2. **Player-driven.** With no secondary candidate in tolerance, both come from the nearest point
    on the constraint manifold to the part's current orientation (§2.3).
 
+**Least rotation rather than least residual, and the difference is not cosmetic.** Folding a panel
+flat onto a panel already placed lands *every* one of its sockets on that panel's sockets, at a
+residual of exactly zero — so ranking closures by residual makes that degenerate answer beat the
+intended one whenever both are available, and an assembly built that way stacks panels rather than
+closing them. It is not a rare case. It cost the buckyball its twelfth face, and nothing
+placed after that had anything to snap to. Since any closure inside the tolerance is geometrically acceptable, the
+question left is which one the builder was aiming at, and rotation is what answers it. What this
+does *not* cover is a coincident placement that is the only closure on offer (§7).
+
+**Adoption takes unconnected target sockets only.** A joint may host more than two panels (§2.4),
+but joining a new part into an *occupied* joint needs the first-class joint of Milestone 3 — until
+then a seam that stays visibly open is a better failure than one that silently became a threesome.
+The anchor is not restricted this way; it is adoption, which nobody is aiming, that must not
+surprise.
+
 A secondary socket lying *on* the anchor axis sweeps a degenerate circle and has no θ to offer;
 detect the near-zero radius and skip it.
+
+#### The adoption tolerance
+
+**2 cm, and it is not a second snap distance.** `SnapDistanceUu` is how near the player must aim;
+the adoption tolerance is how much geometric error a seam may carry and still count as closed, so
+it is far tighter. Panels cut correctly close to float noise: the buckyball's ninety edges came in
+at a worst of 0.06 mm and a mean of 0.006 mm, three hundred times inside the tolerance. Anything
+approaching a millimetre is a panel problem to look at, not a tolerance to widen (§2.4).
 
 **Adopt or drop, per secondary — a failing secondary never rejects the anchor.** The player gets
 the placement they asked for plus an unclosed seam they can see and nudge; refusing the whole
@@ -522,6 +547,24 @@ mixes panel-geometry error — what the test is for — with solver strain, whic
 unrelated. A flawless buckyball would report a nonzero number, and a real 0.2 mm error could hide
 beneath the noise.
 
+**What Milestone 2 measured.** Thirty-two panels, ninety connections, no open socket: the shell
+seals. Thirty-one of the ninety edges are anchors and fifty-nine are adopted, so two thirds of the
+structure is held together by connections nobody aimed at. Worst adoption residual **0.06 mm**,
+mean 0.006 mm, against 2000 mm edges. Simulated, the seams settle at 0.06 mm as well, so the
+constraint solver is holding no strain worth the name.
+
+Two things the run taught that the plan did not anticipate. The first is §2.5's ranking rule; the
+assembly failed on it before it was found. The second is about where a shell is built. The first
+simulated attempt tore itself apart at metres per second, and neither the constraints nor the
+panels were at fault: the shell was built at the world origin, inside the level's own floor.
+Thirty-two rigid bodies that begin simulating already interpenetrating something get flung apart
+by depenetration, and the symptom looks exactly like a constraint network that cannot hold.
+
+The test rig lives in `PolySnapTests` and PolySnap itself knows nothing of buckyballs — a shell is
+assembled out of the parts to hand, never a shape the plugin can make. The rig supplies only what
+a player's hands would: which part, in what order, roughly where. Every transform in the finished
+shell comes from the same query and the same commit the builder component calls.
+
 ## 6. Plugin boundaries
 
 Stated in [README.md](README.md#plugin-boundaries) and in [CLAUDE.md](CLAUDE.md), whose version
@@ -561,7 +604,14 @@ Marked explicitly so nobody builds on them as though they were settled.
 - **Tolerances.** Snap distance and angular thresholds; whether they are global, per socket type,
   or scaled by part size. The **adoption tolerance** (§2.5) is a third and behaves differently:
   too tight and a correctly built vertex refuses its second connection, too loose and visibly
-  misaligned panels are welded into the graph as though they had closed.
+  misaligned panels are welded into the graph as though they had closed. Its value is now 2 cm and Milestone
+  2 says nothing against it. A shell that closes three hundred times inside the tolerance
+  exercises neither edge of the range, so what counts as *too* loose is still unknown.
+- **Coincident placements.** A closure that folds a part flat onto a part already placed is
+  degenerate, and §2.5's least-rotation ranking only stops it winning when a sensible closure is
+  also available. When it is the only closure on offer it is still taken. Whether a placement
+  should be refused for landing a part where a part already is — and how "already is" is decided
+  without a collision query the snapper has no business making — is undesigned.
 - **Anchor selection.** The anchor is exact and every adopted connection carries the residual, so
   which pair anchors decides where the error lands. Whether the player-driven pair is always the
   right anchor is unexplored.

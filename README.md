@@ -104,8 +104,10 @@ merges a set into one rigid body and freezes its geometry, without merging the p
 
 1. [x] **Two parts snap edge-to-edge in PIE.** One part type, one socket type — proves the socket
    math.
-2. [ ] **A closed buckyball.** Hexes and pents assembling into a sealed truncated icosahedron, with the
-   worst adoption residual across the ninety edges reported rather than eyeballed.
+2. [x] **A closed buckyball.** Hexes and pents assembling into a sealed truncated icosahedron, with the
+   worst adoption residual across the ninety edges reported rather than eyeballed. Thirty-two
+   panels, ninety connections, no open socket; worst residual **0.06 mm** on 2000 mm edges, mean
+   0.006 mm. (DESIGN [§5](DESIGN.md#5-milestones))
 3. [ ] **Assembly graph and open-edge queries**, including a joint of degree three.
 4. [ ] **Welding** — merge to a single rigid body, identities preserved, reversible.
 5. [ ] **Save/load** of a complete assembly.
