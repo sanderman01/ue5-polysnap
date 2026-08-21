@@ -1,0 +1,14 @@
+Config/DefaultPolySnap.ini
+  h_72decab43bbb75 5-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "ab19e33e7ff3b335d9088191de42ef2d048c339a",
+  "prompts": {},
+  "humans": {
+    "h_72decab43bbb75": {
+      "author": "Alexander Verbeek <sanderman@gmail.com>"
+    }
+  }
+}
